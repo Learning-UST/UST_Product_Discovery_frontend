@@ -1,0 +1,381 @@
+/* ── Page shell ── */
+.shelf-page {
+  min-height: 100svh;
+  background: #f4f4f1;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Header ── */
+.shelf-page__header {
+  padding: 1.5rem clamp(1rem, 2vw, 2.5rem) 2rem;
+  color: #f4f7f5;
+  background:
+    radial-gradient(circle at 80% 20%, #8f923522, transparent 22%),
+    radial-gradient(circle at 10% 85%, #0b704faa, transparent 28%),
+    linear-gradient(110deg, #02160f 0%, #0a3f2b 48%, #2d6937 100%);
+}
+
+.shelf-page__back {
+  border: 0;
+  border-radius: 999px;
+  padding: 0.6rem 1.1rem;
+  color: #25302b;
+  background: #d7dfd9;
+  font-family: 'Manrope', sans-serif;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.shelf-page__eyebrow {
+  margin: 1.5rem 0 0;
+  color: #a8c0b2;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-family: 'Manrope', sans-serif;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.shelf-page__title {
+  margin: 0.3rem 0 0;
+  color: #f3f5f2;
+  font-family: 'Fraunces', serif;
+  font-size: clamp(2.4rem, 1.8rem + 3vw, 4rem);
+  line-height: 1.06;
+}
+
+.shelf-page__code-row {
+  margin: 0.8rem 0 0;
+  color: #c4d0c9;
+  font-family: 'Manrope', sans-serif;
+  font-size: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.shelf-page__code-badge {
+  display: inline-block;
+  border: 1.5px solid #7aaa90;
+  border-radius: 999px;
+  padding: 0.2rem 0.75rem;
+  color: #e2ece6;
+  font-size: 0.9rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+/* ── Planogram viewer ── */
+.shelf-page__viewer-wrap {
+  width: 100%;
+  background: #fff;
+  overflow: hidden;
+}
+
+.shelf-page__viewer-iframe {
+  width: 100%;
+  height: 400px;
+  border: none;
+  display: block;
+}
+
+.shelf-page__viewer-img {
+  width: 100%;
+  max-height: 420px;
+  object-fit: cover;
+  display: block;
+}
+
+.shelf-page__viewer-fallback {
+  width: 100%;
+  height: 300px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #eef0ec;
+  color: #7a8f83;
+  font-family: 'Manrope', sans-serif;
+  font-size: 1rem;
+}
+
+/* ── Body ── */
+.shelf-page__body {
+  width: min(1100px, calc(100% - 2rem));
+  margin: 0 auto;
+  padding: 1.8rem 0 5rem;
+  flex: 1;
+}
+
+/* ── Search row ── */
+.shelf-page__search-row {
+  display: flex;
+  gap: 0.7rem;
+  align-items: center;
+}
+
+.shelf-page__search-wrap {
+  position: relative;
+  flex: 1;
+}
+
+.shelf-page__search-icon {
+  position: absolute;
+  left: 1rem;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 1.1rem;
+  height: 1.1rem;
+  color: #7a9087;
+  pointer-events: none;
+}
+
+.shelf-page__search {
+  width: 100%;
+  border: 1.5px solid #d4dbd5;
+  border-radius: 999px;
+  padding: 0.85rem 1rem 0.85rem 2.8rem;
+  color: #1a2722;
+  background: #fff;
+  font-family: 'Manrope', sans-serif;
+  font-size: 1rem;
+  box-shadow: 0 2px 8px #00000009;
+  box-sizing: border-box;
+}
+
+.shelf-page__search:focus {
+  outline: none;
+  border-color: #0d5537;
+  box-shadow: 0 0 0 3px #0d553720;
+}
+
+.shelf-page__search-btn {
+  flex-shrink: 0;
+  border: 1.5px solid #c8d4cb;
+  border-radius: 999px;
+  padding: 0.85rem 1.4rem;
+  color: #1a2722;
+  background: #fff;
+  font-family: 'Manrope', sans-serif;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  box-shadow: 0 2px 8px #00000009;
+}
+
+.shelf-page__search-btn:hover {
+  background: #f0f3f0;
+}
+
+/* ── Products heading ── */
+.shelf-page__products-heading {
+  margin: 1.6rem 0 0.9rem;
+  color: #0f1713;
+  font-family: 'Manrope', sans-serif;
+  font-size: 1.15rem;
+  font-weight: 800;
+}
+
+.shelf-page__status {
+  color: #6b7f75;
+  font-family: 'Manrope', sans-serif;
+  font-size: 0.98rem;
+}
+
+.shelf-page__error {
+  color: #9a4533;
+  font-family: 'Manrope', sans-serif;
+  font-size: 0.98rem;
+}
+
+/* ── Products list ── */
+.shelf-page__products {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+/* ── Product card ── */
+.shelf-product {
+  background: #fff;
+  border: 1.5px solid #e4e9e5;
+  border-radius: 1.1rem;
+  overflow: hidden;
+  box-shadow: 0 2px 8px #00000008;
+}
+
+.shelf-product__main {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.95rem 1.1rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+}
+
+.shelf-product__logo {
+  flex-shrink: 0;
+  width: 3.2rem;
+  height: 3.2rem;
+  border-radius: 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-family: 'Manrope', sans-serif;
+  font-size: 0.7rem;
+  font-weight: 800;
+  text-align: center;
+  line-height: 1.2;
+  padding: 0.2rem;
+  word-break: break-word;
+  overflow: hidden;
+}
+
+.shelf-product__info {
+  flex: 1;
+  min-width: 0;
+}
+
+.shelf-product__name {
+  margin: 0;
+  color: #0f1713;
+  font-family: 'Manrope', sans-serif;
+  font-size: 1rem;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.shelf-product__meta {
+  margin: 0.15rem 0 0;
+  color: #7a8f83;
+  font-family: 'Manrope', sans-serif;
+  font-size: 0.88rem;
+}
+
+.shelf-product__right {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.shelf-product__badge {
+  display: inline-block;
+  border-radius: 999px;
+  padding: 0.3rem 0.8rem;
+  font-family: 'Manrope', sans-serif;
+  font-size: 0.82rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.shelf-product__badge--in {
+  color: #fff;
+  background: #0d8046;
+}
+
+.shelf-product__badge--out {
+  color: #fff;
+  background: #c0392b;
+}
+
+.shelf-product__chevron {
+  font-size: 1.3rem;
+  color: #5a7068;
+  line-height: 1;
+  transition: transform 0.2s;
+  display: inline-block;
+}
+
+.shelf-product__chevron.is-open {
+  transform: rotate(180deg);
+}
+
+.shelf-product__detail {
+  padding: 0 1.1rem 1rem 5.3rem;
+  border-top: 1px solid #edf0ed;
+}
+
+.shelf-product__desc {
+  margin: 0.8rem 0 0.5rem;
+  color: #4f6259;
+  font-family: 'Manrope', sans-serif;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.shelf-product__detail-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 1.2rem;
+  margin-top: 0.5rem;
+  color: #5a7068;
+  font-family: 'Manrope', sans-serif;
+  font-size: 0.85rem;
+}
+
+/* ── FAB ── */
+.shelf-page__fab {
+  position: fixed;
+  bottom: 1.5rem;
+  right: 1.5rem;
+  width: 3.2rem;
+  height: 3.2rem;
+  border: 0;
+  border-radius: 50%;
+  background: #0d5537;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 4px 16px #0d5537aa;
+  z-index: 50;
+}
+
+.shelf-page__fab svg {
+  width: 1.4rem;
+  height: 1.4rem;
+}
+
+/* ── Responsive ── */
+@media (width <= 640px) {
+  .shelf-page__viewer-iframe {
+    height: 260px;
+  }
+
+  .shelf-page__search-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .shelf-page__search-btn {
+    text-align: center;
+  }
+
+  .shelf-product__main {
+    padding: 0.75rem 0.85rem;
+  }
+
+  .shelf-product__detail {
+    padding-left: 0.85rem;
+  }
+
+  .shelf-product__badge {
+    display: none;
+  }
+}

@@ -1,0 +1,50 @@
+.steps-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: clamp(1.2rem, 1rem + 1.4vw, 3rem);
+  margin-top: 3.8rem;
+}
+
+.step-card {
+  min-width: 0;
+}
+
+.step-card__number {
+  display: block;
+  font-family: 'Fraunces', serif;
+  font-size: clamp(4.6rem, 3.8rem + 3.2vw, 6.2rem);
+  font-weight: 700;
+  color: #eedbc9;
+  line-height: 1;
+  margin-bottom: 1.05rem;
+}
+
+.step-card__title {
+  font-family: 'Fraunces', serif;
+  font-size: clamp(2rem, 1.55rem + 1.2vw, 3rem);
+  font-weight: 700;
+  color: #0f1713;
+  margin: 0 0 0.85rem;
+  line-height: 1.05;
+}
+
+.step-card__description {
+  font-family: 'Manrope', sans-serif;
+  font-size: clamp(1rem, 0.94rem + 0.18vw, 1.12rem);
+  color: #5c6a63;
+  margin: 0;
+  max-width: 24ch;
+  line-height: 1.55;
+}
+
+@media (width <= 720px) {
+  .steps-grid {
+    grid-template-columns: 1fr;
+    gap: 1.7rem;
+    margin-top: 2.4rem;
+  }
+
+  .step-card__number {
+    margin-bottom: 0.75rem;
+  }
+}

@@ -1,0 +1,30 @@
+.section-heading {
+  max-width: 760px;
+}
+
+.section-heading__eyebrow {
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  color: var(--brand-orange);
+  margin: 0;
+  font-family: 'Manrope', sans-serif;
+  font-size: 0.88rem;
+  font-weight: 800;
+}
+
+.section-heading__title {
+  letter-spacing: -0.03em;
+  margin: 0.7rem 0 0;
+  font-family: 'Fraunces', serif;
+  font-size: clamp(2.25rem, 1.7rem + 2.8vw, 4.5rem);
+  line-height: 0.98;
+}
+
+.section-heading__description {
+  max-width: 34ch;
+  color: var(--text-muted);
+  margin: 1.2rem 0 0;
+  font-family: 'Manrope', sans-serif;
+  font-size: clamp(1.02rem, 0.96rem + 0.4vw, 1.6rem);
+  line-height: 1.45;
+}
