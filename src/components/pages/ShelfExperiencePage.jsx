@@ -385,6 +385,7 @@ function ShelfExperiencePage({ store, layout, onBack }) {
   const [cameraError, setCameraError] = useState('')
   const [isCameraActive, setIsCameraActive] = useState(false)
   const [capturedImage, setCapturedImage] = useState('')
+  const [highlightedProduct, setHighlightedProduct] = useState('')
   const videoRef = useRef(null)
   const streamRef = useRef(null)
 
@@ -489,6 +490,8 @@ function ShelfExperiencePage({ store, layout, onBack }) {
     if (shelfMatch) {
       const key = shelfMatch.id ?? products.indexOf(shelfMatch)
       setExpandedId(key)
+      // Use the original layout name for highlighting (matches planogram's product names exactly)
+      setHighlightedProduct(shelfMatch.layoutName || shelfMatch.name || '')
       const lines = [
         shelfMatch.name,
         shelfMatch.brand        && `Brand: ${shelfMatch.brand}`,
@@ -497,6 +500,7 @@ function ShelfExperiencePage({ store, layout, onBack }) {
       ].filter(Boolean).join('  ·  ')
       setAiResponse(`✅ Found on this shelf\n\n${lines}`)
     } else {
+      setHighlightedProduct('')
       setAiResponse('Searching...')
       try {
         const storeName = store?.name || 'this store'
@@ -674,11 +678,15 @@ function ShelfExperiencePage({ store, layout, onBack }) {
 
       {/* ── 3D Planogram Viewer ── */}
       <div className="shelf-page__viewer-wrap">
-        {layout.previewImage ? (
-          <img
-            src={layout.previewImage}
-            alt={`${layout.name} 3D shelf view`}
-            className="shelf-page__viewer-img"
+        {layout.id ? (
+          <iframe
+            className="shelf-page__viewer-iframe"
+            src={`https://planogram.fcust.com/viewer?shelfId=${encodeURIComponent(layout.id)}${
+              highlightedProduct ? `&highlightProduct=${encodeURIComponent(highlightedProduct)}` : ''
+            }`}
+            title={`3D planogram view – ${layout.name || layout.id}`}
+            allowFullScreen
+            loading="lazy"
           />
         ) : (
           <div className="shelf-page__viewer-fallback">
