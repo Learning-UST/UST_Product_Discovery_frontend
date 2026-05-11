@@ -1,6 +1,13 @@
 // Replace your old API base with the Flask URL
 const FLASK_BASE_URL = 'http://127.0.0.1:5000';
 
+export const fetchAllProductsFull = async () => {
+    const response = await fetch(`${FLASK_BASE_URL}/api/products`);
+    const res = await response.json();
+    const list = Array.isArray(res) ? res : (Array.isArray(res?.data) ? res.data : []);
+    return list;
+};
+
 export const fetchAllProducts = async () => {
     const response = await fetch(`${FLASK_BASE_URL}/api/products?fields=name`);
     const res = await response.json();
