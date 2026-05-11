@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import './styles/StoreExperiencePage.css'
-
+import * as SpeechSDK from 'microsoft-cognitiveservices-speech-sdk';
 function StoreExperiencePage({ store, onChangeStore, onLayoutSelect }) {
   const [activeTab, setActiveTab] = useState('scan')
   const [cameraError, setCameraError] = useState('')
@@ -114,6 +114,39 @@ function StoreExperiencePage({ store, onChangeStore, onLayoutSelect }) {
     setCapturedImage(canvas.toDataURL('image/png'))
     stopCamera()
   }
+
+  const handleSearchSubmit = async () => {
+    // This calls the Agentic Brain we built in Flask
+    const response = await fetch(`${API_BASE}/agent-query`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: searchTerm })
+    });
+    
+    const data = await response.json();
+    // The Agent's natural language answer
+    console.log("Agent Says:", data.answer); 
+    
+    // Logic to highlight products based on Agent's answer
+    if (data.answer.includes("Nissin")) {
+       // Trigger highlight in your Digital Twin UI
+    }
+};
+
+  const handleVoiceSearch = async () => {
+    const { key, region } = await getSpeechToken();
+    const speechConfig = SpeechSDK.SpeechConfig.fromSubscription(key, region);
+    const audioConfig = SpeechSDK.AudioConfig.fromDefaultMicrophoneInput();
+    const recognizer = new SpeechSDK.SpeechRecognizer(speechConfig, audioConfig);
+
+    recognizer.recognizeOnceAsync(result => {
+        if (result.reason === SpeechSDK.ResultReason.RecognizedSpeech) {
+            setSearchTerm(result.text); // Automatically fills the search bar
+            // Trigger the Agentic Search
+            handleAgenticSearch(result.text);
+        }
+    });
+};
 
   const handleGoToLayout = () => {
     if (!selectedShelf) return

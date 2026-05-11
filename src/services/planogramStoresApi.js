@@ -413,6 +413,8 @@ const buildUrl = (path, query) => {
     return url.toString()
 }
 
+const isAbortError = (error) => error?.name === 'AbortError'
+
 const fetchJson = async (path, query) => {
     const response = await fetch(buildUrl(path, query), {
         method: 'GET',
@@ -690,7 +692,11 @@ export const fetchPlanogramStoreById = async (storeId) => {
                 }
             }
         } catch (error) {
-            console.error('FAILED TO LOAD LAYOUTS:', error)
+            if (isAbortError(error)) {
+                console.warn('LAYOUT FETCH TIMED OUT FOR STORE:', storeId)
+            } else {
+                console.error('FAILED TO LOAD LAYOUTS:', error)
+            }
         }
     }
 

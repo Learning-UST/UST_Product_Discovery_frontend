@@ -127,59 +127,82 @@ const parseShelfMeta = (rawLayoutData) => {
   }
 }
 
+// function ProductCard({ product, expanded, onToggle }) {
+//   const brandLabel = getBrandLabel(product)
+//   const color = product.brand_color || getBrandColor(product.brand, product.name)
+//   const inStock = product.stock_count == null ? true : Number(product.stock_count) > 0
+//   const stockCount = product.stock_count ?? product.quantity
+
+//   return (
+//     <li className="shelf-product">
+//       <button type="button" className="shelf-product__main" onClick={onToggle}>
+//         <div
+//           className="shelf-product__logo"
+//           style={{ background: color }}
+//           aria-hidden="true"
+//         >
+//           {brandLabel}
+//         </div>
+//         <div className="shelf-product__info">
+//           <p className="shelf-product__name">{product.name || 'Unknown product'}</p>
+//           <p className="shelf-product__meta">
+//             {[product.category, product.price != null ? `$${Number(product.price).toFixed(2)}` : null]
+//               .filter(Boolean)
+//               .join(' · ')}
+//           </p>
+//         </div>
+//         <div className="shelf-product__right">
+//           {inStock ? (
+//             <span className="shelf-product__badge shelf-product__badge--in">
+//               {stockCount != null ? `${stockCount} in stock` : 'In stock'}
+//             </span>
+//           ) : (
+//             <span className="shelf-product__badge shelf-product__badge--out">Out of stock</span>
+//           )}
+//           <span className={`shelf-product__chevron ${expanded ? 'is-open' : ''}`}>
+//             &#8964;
+//           </span>
+//         </div>
+//       </button>
+
+//       {expanded && (
+//         <div className="shelf-product__detail">
+//           {product.description && (
+//             <p className="shelf-product__desc">{product.description}</p>
+//           )}
+//           <div className="shelf-product__detail-grid">
+//             {product.upc && <span><strong>UPC:</strong> {product.upc}</span>}
+//             {product.heightInCm != null && <span><strong>Height:</strong> {product.heightInCm} cm</span>}
+//             {product.widthInCm != null && <span><strong>Width:</strong> {product.widthInCm} cm</span>}
+//             {product.depthInCm != null && <span><strong>Depth:</strong> {product.depthInCm} cm</span>}
+//           </div>
+//         </div>
+//       )}
+//     </li>
+//   )
+// }
+
 function ProductCard({ product, expanded, onToggle }) {
-  const brandLabel = getBrandLabel(product)
-  const color = product.brand_color || getBrandColor(product.brand, product.name)
-  const inStock = product.stock_count == null ? true : Number(product.stock_count) > 0
-  const stockCount = product.stock_count ?? product.quantity
+  const [liveData, setLiveData] = useState(null);
+
+  useEffect(() => {
+    if (expanded && product.upc) {
+      // FAST PATH: Instant retrieval from Cosmos
+      fetchDirectProductDetails(product.upc).then(res => setLiveData(res.data));
+    }
+  }, [expanded, product.upc]);
+
+  // Use liveData if available, otherwise fallback to static planogram data
+  const finalPrice = liveData ? liveData.final_price : product.price;
+  const isOutOfStock = liveData ? liveData.stock_status === "Out of Stock" : false;
 
   return (
-    <li className="shelf-product">
-      <button type="button" className="shelf-product__main" onClick={onToggle}>
-        <div
-          className="shelf-product__logo"
-          style={{ background: color }}
-          aria-hidden="true"
-        >
-          {brandLabel}
-        </div>
-        <div className="shelf-product__info">
-          <p className="shelf-product__name">{product.name || 'Unknown product'}</p>
-          <p className="shelf-product__meta">
-            {[product.category, product.price != null ? `$${Number(product.price).toFixed(2)}` : null]
-              .filter(Boolean)
-              .join(' · ')}
-          </p>
-        </div>
-        <div className="shelf-product__right">
-          {inStock ? (
-            <span className="shelf-product__badge shelf-product__badge--in">
-              {stockCount != null ? `${stockCount} in stock` : 'In stock'}
-            </span>
-          ) : (
-            <span className="shelf-product__badge shelf-product__badge--out">Out of stock</span>
-          )}
-          <span className={`shelf-product__chevron ${expanded ? 'is-open' : ''}`}>
-            &#8964;
-          </span>
-        </div>
-      </button>
-
-      {expanded && (
-        <div className="shelf-product__detail">
-          {product.description && (
-            <p className="shelf-product__desc">{product.description}</p>
-          )}
-          <div className="shelf-product__detail-grid">
-            {product.upc && <span><strong>UPC:</strong> {product.upc}</span>}
-            {product.heightInCm != null && <span><strong>Height:</strong> {product.heightInCm} cm</span>}
-            {product.widthInCm != null && <span><strong>Width:</strong> {product.widthInCm} cm</span>}
-            {product.depthInCm != null && <span><strong>Depth:</strong> {product.depthInCm} cm</span>}
-          </div>
-        </div>
-      )}
-    </li>
-  )
+    // ... update your JSX to show liveData.applied_promotion if it exists ...
+    <p className="price-display">
+        {liveData?.applied_promotion && <span className="promo-tag">Special Offer!</span>}
+        ₹{finalPrice}
+    </p>
+  );
 }
 
 function ShelfExperiencePage({ store, layout, onBack }) {
