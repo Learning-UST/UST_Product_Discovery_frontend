@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { fetchLayoutById } from '../../services/planogramStoresApi'
-import { fetchDirectProductDetails, fetchAllProducts, sendChatQuery } from '../../services/api'
+import { fetchAllProductsFull, fetchAllProducts, fetchDirectProductDetails, sendChatQuery } from '../../services/api'
 import './styles/ShelfExperiencePage.css'
 
 const KNOWN_BRAND_COLORS = {
@@ -406,40 +406,60 @@ function ShelfExperiencePage({ store, layout, onBack }) {
         // Get all products listed in this shelf from the layout plan (authoritative list)
         const layoutProducts = parseProducts(layoutData)
 
-        // Fetch enriched details (metadata + real stock + calculated final price) for each
-        // product via the direct endpoint in parallel
-        const enrichedResults = await Promise.all(
-          layoutProducts.map(async (lp) => {
-            if (!lp.upc) return null
-            try {
-              const res = await fetchDirectProductDetails(lp.upc)
-              return (res?.status === 'success' && res?.data) ? res.data : null
-            } catch {
-              return null
-            }
-          })
-        )
+        // Fetch full product details from Cosmos
+        const allCosmosProducts = await fetchAllProductsFull()
 
-        // For every product use direct endpoint data if available, else layout data
-        const shelfProducts = layoutProducts.map((lp, idx) => {
-          const dp = enrichedResults[idx]
+        // Normalize name for fuzzy matching: lowercase, strip ALL punctuation
+        const normalizeName = (s) => (s || '').toLowerCase().replace(/[^a-z0-9\s()]/g, '').replace(/\s+/g, ' ').trim()
+
+        // Build lookup map: normalized name → cosmos product
+        const cosmosMap = {}
+        for (const p of allCosmosProducts) {
+          const key = normalizeName(p.Name || p.name)
+          if (key) cosmosMap[key] = p
+        }
+
+        // Fetch only final_price from direct endpoint using UPC and map it by UPC
+        const uniqueUpcs = [...new Set(
+          layoutProducts
+            .map((lp) => {
+              const key = normalizeName(lp.name)
+              const cp = cosmosMap[key]
+              return cp ? (cp.UPC || cp.upc || lp.upc || '') : (lp.upc || '')
+            })
+            .filter(Boolean)
+            .map((u) => String(u))
+        )]
+        const priceMap = {}
+        await Promise.all(uniqueUpcs.map(async (upc) => {
+          try {
+            const res = await fetchDirectProductDetails(upc)
+            const fp = res?.data?.final_price
+            if (fp != null && fp !== '') priceMap[upc] = fp
+          } catch {
+            // Keep graceful fallback to bulk price when direct endpoint fails for an item.
+          }
+        }))
+
+        // For every product in the shelf, use Cosmos data if name matches, else fallback to layout data
+        const shelfProducts = layoutProducts.map((lp) => {
+          const key = normalizeName(lp.name)
+          const cp = cosmosMap[key]
+          const resolvedUpc = cp ? (cp.UPC || cp.upc || lp.upc || '') : (lp.upc || '')
           return {
-            id:               dp ? (dp.id || dp.UPC || dp.upc || lp.id || lp.name) : (lp.id || lp.name),
-            name:             dp ? (dp.name || dp.Name || lp.name) : lp.name,
+            id:               cp ? (cp.id || cp.UPC || cp.upc || lp.id || lp.name) : (lp.id || lp.name),
+            name:             cp ? (cp.Name || cp.name || lp.name) : lp.name,
             layoutName:       lp.name,
-            brand:            dp ? (dp.brand || dp.Brand || lp.brand) : lp.brand,
-            category:         dp ? (dp.category || dp.Category || lp.category) : lp.category,
-            description:      dp ? (dp.description || dp.Description || '') : '',
-            nutritional_facts:dp ? (dp.nutrition || dp.Nutritional_Facts || dp.nutritional_facts || '') : '',
-            upc:              dp ? (dp.upc || dp.UPC || lp.upc) : lp.upc,
-            image_url:        dp ? (dp.image_url || dp.imageUrl || '') : '',
-            base_price:       dp ? (dp.base_price ?? null) : null,
-            price:            dp ? (dp.final_price ?? dp.base_price ?? lp.price ?? null) : (lp.price ?? null),
-            applied_promotion:dp ? (dp.applied_promotion || null) : null,
-            diet_type:        dp ? (dp.diet_type || dp.Diet_Type || dp.tags || dp.Tags || '') : '',
-            ingredients:      dp ? (dp.ingredients || dp.Ingredients || '') : '',
-            stock_status:     dp ? (dp.stock_status || '') : '',
-            stock_count:      dp ? (dp.quantity ?? dp.stock_count ?? lp.stock_count) : lp.stock_count,
+            brand:            cp ? (cp.Brand || cp.brand || lp.brand) : lp.brand,
+            category:         cp ? (cp.Category || cp.category || lp.category) : lp.category,
+            description:      cp ? (cp.Description || cp.description || '') : '',
+            nutritional_facts:cp ? (cp.Nutritional_Facts || cp.nutritional_facts || '') : '',
+            upc:              cp ? (cp.UPC || cp.upc || lp.upc) : lp.upc,
+            image_url:        cp ? (cp.image_url || cp.imageUrl || '') : '',
+            price:            priceMap[String(resolvedUpc)] ?? (cp ? (cp.Price ?? cp.price ?? lp.price ?? null) : (lp.price ?? null)),
+            diet_type:        cp ? (cp.Diet_Type || cp.diet_type || cp.Tags || cp.tags || '') : '',
+            ingredients:      cp ? (cp.Ingredients || cp.ingredients || '') : '',
+            stock_count:      lp.stock_count,
           }
         })
 
