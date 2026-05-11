@@ -6,14 +6,182 @@
   flex-direction: column;
 }
 
+.shelf-page__ai-response {
+  display: block;
+  width: 100%;
+  min-height: 140px;
+  margin-top: 1rem;
+  margin-bottom: 0.5rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid #c8d4cd;
+  border-radius: 12px;
+  background: #fff;
+  font-size: 0.95rem;
+  color: #1a2e24;
+  line-height: 1.6;
+  resize: vertical;
+  outline: none;
+  box-sizing: border-box;
+}
+
 /* ── Header ── */
 .shelf-page__header {
+  position: relative;
   padding: 1.5rem clamp(1rem, 2vw, 2.5rem) 2rem;
   color: #f4f7f5;
   background:
     radial-gradient(circle at 80% 20%, #8f923522, transparent 22%),
     radial-gradient(circle at 10% 85%, #0b704faa, transparent 28%),
     linear-gradient(110deg, #02160f 0%, #0a3f2b 48%, #2d6937 100%);
+}
+
+/* Small square scan button in the top-right of the header */
+.shelf-page__scan-corner-btn {
+  position: absolute;
+  top: 1.1rem;
+  right: 1.1rem;
+  width: 2.6rem;
+  height: 2.6rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px solid rgba(255,255,255,0.45);
+  border-radius: 8px;
+  background: rgba(255,255,255,0.12);
+  color: #f4f7f5;
+  cursor: pointer;
+  padding: 0;
+  transition: background 0.18s;
+}
+.shelf-page__scan-corner-btn:hover {
+  background: rgba(255,255,255,0.22);
+}
+.shelf-page__scan-corner-btn svg {
+  width: 1.35rem;
+  height: 1.35rem;
+}
+
+/* Scan modal overlay */
+.shelf-page__scan-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.72);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+.shelf-page__scan-modal {
+  background: #111;
+  border-radius: 16px;
+  width: min(92vw, 540px);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.shelf-page__scan-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.9rem 1.2rem;
+  background: #1a1a1a;
+  color: #fff;
+}
+.shelf-page__scan-modal-title {
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+.shelf-page__scan-modal-close {
+  background: transparent;
+  border: none;
+  color: #fff;
+  font-size: 1.2rem;
+  cursor: pointer;
+  line-height: 1;
+  padding: 0.2rem 0.4rem;
+  border-radius: 4px;
+  transition: background 0.15s;
+}
+.shelf-page__scan-modal-close:hover {
+  background: rgba(255,255,255,0.15);
+}
+.shelf-page__scan-modal-video {
+  width: 100%;
+  display: block;
+  background: #000;
+  max-height: 60vh;
+  object-fit: cover;
+}
+
+/* Scan drawer (keep for reference) */
+.shelf-page__scan-drawer {
+  background: #fff;
+  padding: 1.2rem clamp(1rem, 2vw, 2.5rem);
+  border-bottom: 1px solid #e0e7e3;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+.shelf-page__scan-open-btn {
+  width: 100%;
+  padding: 0.85rem 1rem;
+  background: #0a3f2b;
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.shelf-page__camera-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.shelf-page__camera {
+  width: 100%;
+  border-radius: 10px;
+  background: #000;
+}
+.shelf-page__camera-actions {
+  display: flex;
+  gap: 0.75rem;
+}
+.shelf-page__capture-btn {
+  flex: 1;
+  padding: 0.7rem;
+  background: #0a3f2b;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.shelf-page__secondary-btn {
+  flex: 1;
+  padding: 0.7rem;
+  background: transparent;
+  color: #0a3f2b;
+  border: 1.5px solid #0a3f2b;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.shelf-page__capture-result {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.shelf-page__capture-label {
+  font-size: 0.85rem;
+  color: #555;
+  margin: 0;
+}
+.shelf-page__captured-image {
+  width: 100%;
+  border-radius: 10px;
+  object-fit: cover;
 }
 
 .shelf-page__back {

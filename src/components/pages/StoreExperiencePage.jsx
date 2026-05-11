@@ -8,6 +8,7 @@ function StoreExperiencePage({ store, onChangeStore, onLayoutSelect }) {
   const [capturedImage, setCapturedImage] = useState('')
   const [selectedShelf, setSelectedShelf] = useState('')
   const [searchTerm, setSearchTerm] = useState('')
+  const [aiResponse, setAiResponse] = useState('')
   const videoRef = useRef(null)
   const streamRef = useRef(null)
 
@@ -284,6 +285,12 @@ function StoreExperiencePage({ store, onChangeStore, onLayoutSelect }) {
               value={searchTerm}
               onChange={(event) => setSearchTerm(event.target.value)}
               placeholder="Search by product or brand"
+            />
+            <textarea
+              className="store-page__ai-response"
+              readOnly
+              value={aiResponse}
+              placeholder="AI response will appear here..."
             />
           </div>
         )}

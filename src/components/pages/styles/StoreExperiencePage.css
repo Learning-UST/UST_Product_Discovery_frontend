@@ -3,6 +3,23 @@
   background: #f4f4f1;
 }
 
+.store-page__ai-response {
+  display: block;
+  width: 100%;
+  min-height: 140px;
+  margin-top: 1rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid #c8d4cd;
+  border-radius: 12px;
+  background: #fff;
+  font-size: 0.95rem;
+  color: #1a2e24;
+  line-height: 1.6;
+  resize: vertical;
+  outline: none;
+  box-sizing: border-box;
+}
+
 .store-page__hero {
   padding: 3rem clamp(1rem, 2vw, 2rem) 3.5rem;
   color: #f4f7f5;

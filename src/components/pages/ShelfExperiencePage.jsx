@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { fetchLayoutById } from '../../services/planogramStoresApi'
 import './styles/ShelfExperiencePage.css'
 
@@ -212,7 +212,14 @@ function ShelfExperiencePage({ store, layout, onBack }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [searchTerm, setSearchTerm] = useState('')
+  const [aiResponse, setAiResponse] = useState('')
   const [expandedId, setExpandedId] = useState(null)
+  const [scanOpen, setScanOpen] = useState(false)
+  const [cameraError, setCameraError] = useState('')
+  const [isCameraActive, setIsCameraActive] = useState(false)
+  const [capturedImage, setCapturedImage] = useState('')
+  const videoRef = useRef(null)
+  const streamRef = useRef(null)
 
   useEffect(() => {
     let cancelled = false
@@ -252,6 +259,76 @@ function ShelfExperiencePage({ store, layout, onBack }) {
     setExpandedId((prev) => (prev === key ? null : key))
   }
 
+  const startCamera = async () => {
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setCameraError('Camera is not available on this browser.')
+      return
+    }
+    try {
+      setCameraError('')
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((track) => track.stop())
+      }
+      let stream
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } },
+          audio: false,
+        })
+      } catch {
+        stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false })
+      }
+      streamRef.current = stream
+      setCapturedImage('')
+      setIsCameraActive(true)
+    } catch {
+      setCameraError('Camera access failed.')
+      setIsCameraActive(false)
+    }
+  }
+
+  const stopCamera = () => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop())
+      streamRef.current = null
+    }
+    if (videoRef.current) videoRef.current.srcObject = null
+    setIsCameraActive(false)
+  }
+
+  const captureFrame = () => {
+    if (!videoRef.current) return
+    const video = videoRef.current
+    const canvas = document.createElement('canvas')
+    canvas.width = video.videoWidth || 1280
+    canvas.height = video.videoHeight || 720
+    const context = canvas.getContext('2d')
+    if (!context) { setCameraError('Capture failed.'); return }
+    context.drawImage(video, 0, 0, canvas.width, canvas.height)
+    setCapturedImage(canvas.toDataURL('image/png'))
+    stopCamera()
+  }
+
+  const handleRetake = async () => {
+    setCapturedImage('')
+    await startCamera()
+  }
+
+  useEffect(() => {
+    const attachStream = async () => {
+      if (!isCameraActive || !videoRef.current || !streamRef.current) return
+      videoRef.current.srcObject = streamRef.current
+      try { await videoRef.current.play() } catch { setCameraError('Camera started but video playback failed.') }
+    }
+    attachStream()
+  }, [isCameraActive])
+
+  useEffect(() => {
+    return () => {
+      if (streamRef.current) streamRef.current.getTracks().forEach((track) => track.stop())
+    }
+  }, [])
+
   // The API response wraps layout_data; preview_image is not returned by this endpoint.
   // We display the 3D planogram viewer via iframe and fall back to a placeholder.
 
@@ -265,6 +342,19 @@ function ShelfExperiencePage({ store, layout, onBack }) {
         <button type="button" className="shelf-page__back" onClick={onBack}>
           &#8592; Back to store
         </button>
+        <button
+          type="button"
+          className="shelf-page__scan-corner-btn"
+          aria-label="Scan shelf"
+          onClick={() => { const opening = !scanOpen; setScanOpen(opening); setCapturedImage(''); setCameraError(''); if (opening) { startCamera(); } else { stopCamera(); } }}
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+            <rect x="3" y="3" width="7" height="7" rx="1" />
+            <rect x="14" y="3" width="7" height="7" rx="1" />
+            <rect x="3" y="14" width="7" height="7" rx="1" />
+            <path d="M14 14h2v2h-2zM18 14h3M14 18v3M18 18h3v3h-3z" strokeLinecap="round" />
+          </svg>
+        </button>
         <p className="shelf-page__eyebrow">AISLE {shelfMeta.aisleNumber}</p>
         <h1 className="shelf-page__title">{layout.name}</h1>
         <p className="shelf-page__code-row">
@@ -272,6 +362,35 @@ function ShelfExperiencePage({ store, layout, onBack }) {
           <span className="shelf-page__code-badge">{shelfCodeDisplay}</span>
         </p>
       </header>
+
+      {/* ── Scan modal ── */}
+      {scanOpen && (
+        <div className="shelf-page__scan-modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) { stopCamera(); setScanOpen(false); } }}>
+          <div className="shelf-page__scan-modal">
+            <div className="shelf-page__scan-modal-header">
+              <span className="shelf-page__scan-modal-title">Scan Shelf</span>
+              <button
+                type="button"
+                className="shelf-page__scan-modal-close"
+                onClick={() => { stopCamera(); setScanOpen(false); }}
+                aria-label="Close"
+              >
+                &#x2715;
+              </button>
+            </div>
+            {cameraError && <p className="shelf-page__error">{cameraError}</p>}
+            {isCameraActive && (
+              <video ref={videoRef} autoPlay playsInline muted className="shelf-page__scan-modal-video" />
+            )}
+            {capturedImage && (
+              <div className="shelf-page__capture-result">
+                <img src={capturedImage} alt="Captured shelf" className="shelf-page__captured-image" />
+                <button type="button" className="shelf-page__secondary-btn" onClick={handleRetake}>Retake</button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* ── 3D Planogram Viewer ── */}
       <div className="shelf-page__viewer-wrap">
@@ -309,6 +428,13 @@ function ShelfExperiencePage({ store, layout, onBack }) {
             Search store
           </button>
         </div>
+
+        <textarea
+          className="shelf-page__ai-response"
+          readOnly
+          value={aiResponse}
+          placeholder="AI response will appear here..."
+        />
 
         {/* Products section */}
         <h2 className="shelf-page__products-heading">
