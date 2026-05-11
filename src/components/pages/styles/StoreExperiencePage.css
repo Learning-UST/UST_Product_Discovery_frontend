@@ -3,6 +3,109 @@
   background: #f4f4f1;
 }
 
+/* Search wrap (relative for dropdown positioning) */
+.store-page__search-wrap {
+  position: relative;
+  width: 100%;
+}
+
+/* Selected product chips */
+.store-page__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin-bottom: 0.6rem;
+}
+.store-page__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.3rem 0.7rem;
+  background: #d4ede1;
+  color: #0a3f2b;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  font-weight: 500;
+}
+.store-page__chip-remove {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: #0a3f2b;
+  font-size: 0.75rem;
+  line-height: 1;
+  padding: 0;
+  display: flex;
+  align-items: center;
+}
+
+/* Live search dropdown */
+.store-page__search-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  background: #fff;
+  border: 1px solid #c8d4cd;
+  border-radius: 12px;
+  max-height: 260px;
+  overflow-y: auto;
+  z-index: 100;
+  list-style: none;
+  margin: 0;
+  padding: 0.3rem 0;
+  box-shadow: 0 6px 24px rgba(0,0,0,0.10);
+}
+.store-page__search-option {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.65rem 1rem;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+.store-page__search-option:hover,
+.store-page__search-option.is-selected {
+  background: #f0f7f4;
+}
+.store-page__option-name {
+  flex: 1;
+  font-size: 0.92rem;
+  color: #1a2e24;
+  font-weight: 500;
+}
+.store-page__option-brand {
+  font-size: 0.78rem;
+  color: #7a9b8a;
+}
+.store-page__option-check {
+  color: #0a3f2b;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.store-page__ask-btn {
+  display: block;
+  width: 100%;
+  margin-top: 0.65rem;
+  padding: 0.75rem 1rem;
+  background: #0a3f2b;
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.store-page__ask-btn:hover:not(:disabled) {
+  background: #0d5238;
+}
+.store-page__ask-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
 .store-page__ai-response {
   display: block;
   width: 100%;

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import './styles/StoreExperiencePage.css'
 import * as SpeechSDK from 'microsoft-cognitiveservices-speech-sdk';
+import { fetchAllProducts, fetchDirectProductDetails, sendChatQuery } from '../../services/api'
 function StoreExperiencePage({ store, onChangeStore, onLayoutSelect }) {
   const [activeTab, setActiveTab] = useState('scan')
   const [cameraError, setCameraError] = useState('')
@@ -9,6 +10,11 @@ function StoreExperiencePage({ store, onChangeStore, onLayoutSelect }) {
   const [selectedShelf, setSelectedShelf] = useState('')
   const [searchTerm, setSearchTerm] = useState('')
   const [aiResponse, setAiResponse] = useState('')
+  const [allProducts, setAllProducts] = useState([])
+  const [searchResults, setSearchResults] = useState([])
+  const [selectedProducts, setSelectedProducts] = useState([])
+  const [showDropdown, setShowDropdown] = useState(false)
+  const [productLoadError, setProductLoadError] = useState('')
   const videoRef = useRef(null)
   const streamRef = useRef(null)
 
@@ -149,6 +155,109 @@ function StoreExperiencePage({ store, onChangeStore, onLayoutSelect }) {
     });
 };
 
+  // Load all products whenever Search tab is opened
+  useEffect(() => {
+    if (activeTab !== 'search') return
+    setProductLoadError('')
+    fetchAllProducts()
+      .then((res) => {
+        const list = Array.isArray(res) ? res : (Array.isArray(res?.data) ? res.data : [])
+        if (list.length === 0 && res?.status && res.status !== 'success') {
+          setProductLoadError('Could not load products: ' + (res.message || res.error || 'unknown error'))
+        }
+        setAllProducts(list)
+      })
+      .catch((err) => setProductLoadError('Failed to reach product API: ' + err.message))
+  }, [activeTab])
+
+  // Filter products as user types
+  useEffect(() => {
+    const term = searchTerm.trim().toLowerCase()
+    if (!term) { setSearchResults([]); setShowDropdown(false); return }
+    const filtered = allProducts.filter((p) => {
+      // Check both capitalized (raw Cosmos) and lowercase field names
+      const name = (p.Name || p.name || p.product_name || '').toLowerCase()
+      const brand = (p.Brand || p.brand || '').toLowerCase()
+      return name.includes(term) || brand.includes(term)
+    })
+    setSearchResults(filtered)
+    setShowDropdown(filtered.length > 0)
+  }, [searchTerm, allProducts])
+
+  const formatProductDetails = (p) => {
+    const fields = [
+      ['Name',              p.Name             || p.name],
+      ['Brand',             p.Brand            || p.brand],
+      ['Category',          p.Category         || p.category],
+      ['Description',       p.Description      || p.description],
+      ['Nutritional Facts', p.Nutritional_Facts || p.nutritional_facts],
+    ]
+    return fields
+      .filter(([, v]) => v != null && v !== '')
+      .map(([k, v]) => `${k}: ${v}`)
+      .join('\n')
+  }
+
+  const handleSelectProduct = (product) => {
+    const id = product.id || product.Name || product.name || product.product_name
+    const label = product.Name || product.name || product.product_name || ''
+    setSelectedProducts((prev) => {
+      const alreadySelected = prev.find((p) => (p.id || p.Name || p.name || p.product_name) === id)
+      const updated = alreadySelected
+        ? prev.filter((p) => (p.id || p.Name || p.name || p.product_name) !== id)
+        : [...prev, product]
+      // Update search bar to show all selected product names comma-separated
+      setSearchTerm(updated.map((p) => p.Name || p.name || p.product_name || '').join(', '))
+
+      // Display details directly from the already-fetched product objects
+      if (updated.length === 0) {
+        setAiResponse('')
+      } else {
+        const text = updated
+          .map((p) => formatProductDetails(p))
+          .join('\n\n' + '─'.repeat(40) + '\n\n')
+        setAiResponse(text)
+      }
+
+      return updated
+    })
+    setShowDropdown(false)
+  }
+
+  const isSelected = (product) => {
+    const id = product.id || product.name || product.product_name
+    return selectedProducts.some((p) => (p.id || p.name || p.product_name) === id)
+  }
+
+  const removeSelected = (product) => {
+    const id = product.id || product.Name || product.name || product.product_name
+    setSelectedProducts((prev) => {
+      const updated = prev.filter((p) => (p.id || p.Name || p.name || p.product_name) !== id)
+      setSearchTerm(updated.map((p) => p.Name || p.name || p.product_name || '').join(', '))
+      if (updated.length === 0) {
+        setAiResponse('')
+      } else {
+        const text = updated
+          .map((p) => formatProductDetails(p))
+          .join('\n\n' + '─'.repeat(40) + '\n\n')
+        setAiResponse(text)
+      }
+      return updated
+    })
+  }
+
+  const handleChatQuery = async () => {
+    const query = searchTerm.trim()
+    if (!query) return
+    setAiResponse('Thinking...')
+    try {
+      const res = await sendChatQuery(query)
+      setAiResponse(res.answer || JSON.stringify(res))
+    } catch (err) {
+      setAiResponse('Error: ' + err.message)
+    }
+  }
+
   const handleGoToLayout = () => {
     if (!selectedShelf) return
     const layout = Array.isArray(store.layouts)
@@ -279,13 +388,82 @@ function StoreExperiencePage({ store, onChangeStore, onLayoutSelect }) {
         ) : (
           <div className="store-page__panel">
             <h2 className="store-page__panel-title">Search products in this store</h2>
-            <input
-              type="search"
-              className="store-page__search-input"
-              value={searchTerm}
-              onChange={(event) => setSearchTerm(event.target.value)}
-              placeholder="Search by product or brand"
-            />
+
+            {/* Selected product chips */}
+            {selectedProducts.length > 0 && (
+              <div className="store-page__chips">
+                {selectedProducts.map((p) => {
+                  const id = p.id || p.name || p.product_name
+                  const label = p.name || p.product_name || id
+                  return (
+                    <span key={id} className="store-page__chip">
+                      {label}
+                      <button
+                        type="button"
+                        className="store-page__chip-remove"
+                        onClick={() => removeSelected(p)}
+                        aria-label={`Remove ${label}`}
+                      >
+                        &#x2715;
+                      </button>
+                    </span>
+                  )
+                })}
+              </div>
+            )}
+
+            {/* Search input with live dropdown */}
+            <div className="store-page__search-wrap">
+              <input
+                type="search"
+                className="store-page__search-input"
+                value={searchTerm}
+                onChange={(event) => setSearchTerm(event.target.value)}
+                onFocus={() => searchResults.length > 0 && setShowDropdown(true)}
+                onBlur={() => setTimeout(() => setShowDropdown(false), 150)}
+                onKeyDown={(e) => { if (e.key === 'Enter' && !showDropdown) handleChatQuery() }}
+                placeholder="Search products or ask a question..."
+                autoComplete="off"
+              />
+              {productLoadError && (
+                <p className="store-page__error" style={{ marginTop: '0.4rem', fontSize: '0.82rem' }}>
+                  {productLoadError}
+                </p>
+              )}
+              {showDropdown && (
+                <ul className="store-page__search-dropdown" role="listbox">
+                  {searchResults.map((product, i) => {
+                    const id = product.id || product._id || product.UPC || product.upc || i
+                    const label = product.Name || product.name || product.product_name || product.ProductName || String(id)
+                    const brand = product.Brand || product.brand || ''
+                    const selected = isSelected(product)
+                    return (
+                      <li
+                        key={id}
+                        role="option"
+                        aria-selected={selected}
+                        className={`store-page__search-option${selected ? ' is-selected' : ''}`}
+                        onMouseDown={() => handleSelectProduct(product)}
+                      >
+                        <span className="store-page__option-name">{label}</span>
+                        {brand && <span className="store-page__option-brand">{brand}</span>}
+                        {selected && <span className="store-page__option-check">&#10003;</span>}
+                      </li>
+                    )
+                  })}
+                </ul>
+              )}
+            </div>
+
+            <button
+              type="button"
+              className="store-page__ask-btn"
+              onClick={handleChatQuery}
+              disabled={!searchTerm.trim()}
+            >
+              Ask AI
+            </button>
+
             <textarea
               className="store-page__ai-response"
               readOnly
