@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { fetchLayoutById } from '../../services/planogramStoresApi'
+import { fetchAllProductsFull } from '../../services/api'
 import './styles/ShelfExperiencePage.css'
 
 const KNOWN_BRAND_COLORS = {
@@ -182,27 +183,103 @@ const parseShelfMeta = (rawLayoutData) => {
 //   )
 // }
 
-function ProductCard({ product, expanded, onToggle }) {
-  const [liveData, setLiveData] = useState(null);
+function ProductCard({ product, shelfFolder, expanded, onToggle }) {
+  const EXTENSIONS = ['jpg', 'png', 'jpeg', 'webp']
+  const brandLabel = product.brand ? product.brand.split(' ')[0] : (product.name || '?').split(' ')[0]
+  const color = getBrandColor(product.brand, product.name)
+  const inStock = product.stock_count == null ? true : Number(product.stock_count) > 0
+  const stockCount = product.stock_count
 
-  useEffect(() => {
-    if (expanded && product.upc) {
-      // FAST PATH: Instant retrieval from Cosmos
-      fetchDirectProductDetails(product.upc).then(res => setLiveData(res.data));
+  // Encode only characters that break URLs but may appear in product file names
+  const encodeFileName = (n) => n.replace(/%/g, '%25').replace(/#/g, '%23').replace(/\?/g, '%3F')
+
+  // Build candidate base paths in priority order:
+  // 1. Cosmos image_url (authoritative),
+  // 2. Layout subfolder + Cosmos name, 3. Layout subfolder + original layout name (preserves apostrophes matching actual file)
+  // 4. Flat /images/ root with both name variants
+  const buildCandidates = () => {
+    const cosmosName = product.name || ''
+    const layoutName = product.layoutName || cosmosName
+    // Also try variant where % → " Percent" to match files saved with word "Percent"
+    const percentVariant = (n) => n.replace(/%/g, ' Percent').replace(/\s{2,}/g, ' ').trim()
+    // Collect unique name variants (Cosmos-enriched name + original layout name + percent-word variants)
+    const nameVariants = [...new Set(
+      [cosmosName, layoutName, percentVariant(cosmosName), percentVariant(layoutName)].filter(Boolean)
+    )]
+    const list = []
+    if (product.image_url) {
+      list.push(`/${product.image_url.replace(/^\//, '').replace(/\.[^.]+$/, '')}`)
     }
-  }, [expanded, product.upc]);
+    for (const n of nameVariants) {
+      const enc = encodeFileName(n)
+      if (shelfFolder) list.push(`/images/${shelfFolder}/${enc}`)
+      list.push(`/images/${enc}`)
+    }
+    return list
+  }
 
-  // Use liveData if available, otherwise fallback to static planogram data
-  const finalPrice = liveData ? liveData.final_price : product.price;
-  const isOutOfStock = liveData ? liveData.stock_status === "Out of Stock" : false;
+  const candidates = buildCandidates()
+  const total = candidates.length * EXTENSIONS.length
+  const [attempt, setAttempt] = useState(0)
+  const showImage = attempt < total
+  const imgSrc = showImage
+    ? `${candidates[Math.floor(attempt / EXTENSIONS.length)]}.${EXTENSIONS[attempt % EXTENSIONS.length]}`
+    : null
+
+  const handleImgError = () => setAttempt((a) => a + 1)
 
   return (
-    // ... update your JSX to show liveData.applied_promotion if it exists ...
-    <p className="price-display">
-        {liveData?.applied_promotion && <span className="promo-tag">Special Offer!</span>}
-        ₹{finalPrice}
-    </p>
-  );
+    <li className="shelf-product">
+      <button type="button" className="shelf-product__main" onClick={onToggle}>
+        {showImage ? (
+          <img
+            src={imgSrc}
+            alt={product.name}
+            className="shelf-product__img"
+            onError={handleImgError}
+          />
+        ) : (
+          <div
+            className="shelf-product__logo"
+            style={{ background: color }}
+            aria-hidden="true"
+          >
+            {brandLabel}
+          </div>
+        )}
+        <div className="shelf-product__info">
+          <p className="shelf-product__name">{product.name || 'Unknown product'}</p>
+          <p className="shelf-product__meta">
+            {[product.brand, product.category]
+              .filter(Boolean)
+              .join(' · ')}
+          </p>
+        </div>
+        <div className="shelf-product__right">
+          {inStock ? (
+            <span className="shelf-product__badge shelf-product__badge--in">
+              {stockCount != null ? `${stockCount} in stock` : 'In stock'}
+            </span>
+          ) : (
+            <span className="shelf-product__badge shelf-product__badge--out">Out of stock</span>
+          )}
+          <span className={`shelf-product__chevron ${expanded ? 'is-open' : ''}`}>&#8964;</span>
+        </div>
+      </button>
+
+      {expanded && (
+        <div className="shelf-product__detail">
+          {product.description && <p className="shelf-product__desc">{product.description}</p>}
+          {product.nutritional_facts && (
+            <p className="shelf-product__desc"><strong>Nutritional Facts:</strong> {product.nutritional_facts}</p>
+          )}
+          <div className="shelf-product__detail-grid">
+            {product.upc && <span><strong>UPC:</strong> {product.upc}</span>}
+          </div>
+        </div>
+      )}
+    </li>
+  )
 }
 
 function ShelfExperiencePage({ store, layout, onBack }) {
@@ -233,8 +310,43 @@ function ShelfExperiencePage({ store, layout, onBack }) {
         if (cancelled) return
         const layoutData = response.layout_data
         setFullLayout(response)
-        setProducts(parseProducts(layoutData))
         setShelfMeta(parseShelfMeta(layoutData))
+
+        // Get all products listed in this shelf from the layout plan (authoritative list)
+        const layoutProducts = parseProducts(layoutData)
+
+        // Fetch full product details from Cosmos
+        const allCosmosProducts = await fetchAllProductsFull()
+
+        // Normalize name for fuzzy matching: lowercase, strip ALL punctuation (apostrophes, hyphens, dots, etc.)
+        const normalizeName = (s) => (s || '').toLowerCase().replace(/[^a-z0-9\s()]/g, '').replace(/\s+/g, ' ').trim()
+
+        // Build lookup map: normalized name → cosmos product
+        const cosmosMap = {}
+        for (const p of allCosmosProducts) {
+          const key = normalizeName(p.Name || p.name)
+          if (key) cosmosMap[key] = p
+        }
+
+        // For every product in the shelf, use Cosmos data if name matches, else fallback to layout data
+        const shelfProducts = layoutProducts.map((lp) => {
+          const key = normalizeName(lp.name)
+          const cp = cosmosMap[key]
+          return {
+            id:               cp ? (cp.id || cp.UPC || cp.upc || lp.id || lp.name) : (lp.id || lp.name),
+            name:             cp ? (cp.Name || cp.name || lp.name) : lp.name,
+            layoutName:       lp.name,   // original layout name — used as image path fallback
+            brand:            cp ? (cp.Brand || cp.brand || lp.brand) : lp.brand,
+            category:         cp ? (cp.Category || cp.category || lp.category) : lp.category,
+            description:      cp ? (cp.Description || cp.description || '') : '',
+            nutritional_facts:cp ? (cp.Nutritional_Facts || cp.nutritional_facts || '') : '',
+            upc:              cp ? (cp.UPC || cp.upc || lp.upc) : lp.upc,
+            image_url:        cp ? (cp.image_url || cp.imageUrl || '') : '',
+            stock_count:      lp.stock_count,
+          }
+        })
+
+        if (!cancelled) setProducts(shelfProducts)
       } catch {
         if (!cancelled) setError('Failed to load shelf data from planogram.')
       } finally {
@@ -455,6 +567,7 @@ function ShelfExperiencePage({ store, layout, onBack }) {
               <ProductCard
                 key={key}
                 product={product}
+                shelfFolder={shelfMeta.shelfCode}
                 expanded={expandedId === key}
                 onToggle={() => toggleProduct(key)}
               />
