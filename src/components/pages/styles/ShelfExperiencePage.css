@@ -340,6 +340,93 @@
   background: #f0f3f0;
 }
 
+.shelf-page__ask-btn {
+  flex-shrink: 0;
+  border: none;
+  border-radius: 999px;
+  padding: 0.85rem 1.5rem;
+  color: #fff;
+  background: #0d5537;
+  font-family: 'Manrope', sans-serif;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  box-shadow: 0 2px 8px #0d553730;
+  transition: background 0.15s;
+}
+
+.shelf-page__ask-btn:hover {
+  background: #0a3f28;
+}
+
+.shelf-page__ask-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* ── Search dropdown ── */
+.shelf-page__search-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  background: #fff;
+  border: 1.5px solid #d4dbd5;
+  border-radius: 1rem;
+  box-shadow: 0 8px 24px #00000014;
+  list-style: none;
+  margin: 0;
+  padding: 0.4rem 0;
+  z-index: 200;
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.shelf-page__search-option {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.65rem 1.1rem;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+
+.shelf-page__search-option:hover {
+  background: #f2f6f3;
+}
+
+.shelf-page__search-option-name {
+  flex: 1;
+  font-family: 'Manrope', sans-serif;
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: #0f1713;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.shelf-page__search-option-brand {
+  font-family: 'Manrope', sans-serif;
+  font-size: 0.8rem;
+  color: #7a8f83;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.shelf-page__search-option-on-shelf {
+  flex-shrink: 0;
+  font-family: 'Manrope', sans-serif;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #0a6638;
+  background: #d4f0e3;
+  border-radius: 999px;
+  padding: 0.18rem 0.55rem;
+}
+
 /* ── Products heading ── */
 .shelf-page__products-heading {
   margin: 1.6rem 0 0.9rem;
@@ -483,26 +570,210 @@
 }
 
 .shelf-product__detail {
-  padding: 0 1.1rem 1rem 5.3rem;
+  padding: 1.2rem 1.2rem 1.4rem;
   border-top: 1px solid #edf0ed;
 }
 
-.shelf-product__desc {
-  margin: 0.8rem 0 0.5rem;
-  color: #4f6259;
+.shelf-product__detail-layout {
+  display: flex;
+  gap: 1.4rem;
+  align-items: flex-start;
+}
+
+.shelf-product__detail-img-wrap {
+  flex-shrink: 0;
+  width: 220px;
+  height: 220px;
+  border-radius: 1.1rem;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.shelf-product__detail-big-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.shelf-product__detail-img-fallback {
+  color: #fff;
+  font-family: 'Manrope', sans-serif;
+  font-size: 1.8rem;
+  font-weight: 800;
+  text-align: center;
+  padding: 1rem;
+  line-height: 1.2;
+}
+
+.shelf-product__detail-right {
+  flex: 1;
+  min-width: 0;
+}
+
+.shelf-product__detail-title-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.shelf-product__detail-name {
+  margin: 0;
+  font-family: 'Manrope', sans-serif;
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: #0f1713;
+  line-height: 1.3;
+}
+
+.shelf-product__detail-price {
+  font-family: 'Manrope', sans-serif;
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: #0d5537;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.shelf-product__detail-cat {
+  margin: 0.25rem 0 0;
+  font-family: 'Manrope', sans-serif;
+  font-size: 0.88rem;
+  color: #7a8f83;
+}
+
+.shelf-product__detail-badges {
+  display: flex;
+  gap: 0.5rem;
+  margin: 0.6rem 0 0;
+  flex-wrap: wrap;
+}
+
+.shelf-product__detail-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  border-radius: 999px;
+  padding: 0.28rem 0.9rem;
+  font-family: 'Manrope', sans-serif;
+  font-size: 0.82rem;
+  font-weight: 600;
+  background: #d4f0e3;
+  color: #0a6638;
+}
+
+.shelf-product__detail-desc {
+  margin: 0.7rem 0 0;
   font-family: 'Manrope', sans-serif;
   font-size: 0.9rem;
+  color: #4f6259;
+  line-height: 1.55;
+}
+
+.shelf-product__detail-section-heading {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin: 1rem 0 0.45rem;
+  font-family: 'Manrope', sans-serif;
+  font-size: 0.95rem;
+  color: #0f1713;
+}
+
+.shelf-product__detail-section-sub {
+  font-weight: 400;
+  color: #7a8f83;
+}
+
+.shelf-product__nutr-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  gap: 0.5rem;
+}
+
+.shelf-product__nutr-row {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.18rem;
+  background: #f2f5f2;
+  border-radius: 0.75rem;
+  padding: 0.65rem 0.5rem;
+  font-family: 'Manrope', sans-serif;
+  text-align: center;
+  min-width: 0;
+}
+
+.shelf-product__nutr-label {
+  font-size: 0.75rem;
+  color: #7a8f83;
+  line-height: 1.2;
+  word-break: break-word;
+}
+
+.shelf-product__nutr-value {
+  font-size: 1rem;
+  font-weight: 800;
+  color: #0f1713;
+  line-height: 1.15;
+}
+
+.shelf-product__detail-ingredients {
+  margin: 0.3rem 0 0;
+  font-family: 'Manrope', sans-serif;
+  font-size: 0.88rem;
+  color: #4f6259;
   line-height: 1.5;
 }
 
-.shelf-product__detail-grid {
+/* Price row below nutrition/ingredients */
+.shelf-product__price-row {
   display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  margin-top: 1.1rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid #edf0ed;
   flex-wrap: wrap;
-  gap: 0.4rem 1.2rem;
-  margin-top: 0.5rem;
-  color: #5a7068;
+}
+
+.shelf-product__price-label {
   font-family: 'Manrope', sans-serif;
-  font-size: 0.85rem;
+  font-size: 0.82rem;
+  color: #7a8f83;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  margin-right: 0.2rem;
+}
+
+.shelf-product__price-final {
+  font-family: 'Manrope', sans-serif;
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #0d5537;
+  line-height: 1;
+}
+
+.shelf-product__price-base {
+  font-family: 'Manrope', sans-serif;
+  font-size: 0.95rem;
+  color: #9aab9e;
+  text-decoration: line-through;
+}
+
+.shelf-product__price-promo {
+  font-family: 'Manrope', sans-serif;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #c0520f;
+  background: #fdecd5;
+  border-radius: 999px;
+  padding: 0.2rem 0.65rem;
 }
 
 /* ── FAB ── */
@@ -550,6 +821,19 @@
 
   .shelf-product__detail {
     padding-left: 0.85rem;
+  }
+
+  .shelf-product__detail-layout {
+    flex-direction: column;
+  }
+
+  .shelf-product__detail-img-wrap {
+    width: 100%;
+    height: 200px;
+  }
+
+  .shelf-product__nutr-grid {
+    grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
   }
 
   .shelf-product__badge {

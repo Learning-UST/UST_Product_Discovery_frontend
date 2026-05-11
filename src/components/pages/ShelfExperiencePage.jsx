@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { fetchLayoutById } from '../../services/planogramStoresApi'
-import { fetchAllProductsFull } from '../../services/api'
+import { fetchDirectProductDetails, fetchAllProducts, sendChatQuery } from '../../services/api'
 import './styles/ShelfExperiencePage.css'
 
 const KNOWN_BRAND_COLORS = {
@@ -183,6 +183,45 @@ const parseShelfMeta = (rawLayoutData) => {
 //   )
 // }
 
+const parseNutrition = (facts) => {
+  if (!facts) return { nutrients: [], ingredients: '' }
+  let obj = null
+  if (typeof facts === 'string') {
+    try { obj = JSON.parse(facts) } catch { obj = null }
+  } else if (typeof facts === 'object' && facts !== null) {
+    obj = facts
+  }
+  if (obj && !Array.isArray(obj)) {
+    const { ingredients, Ingredients, ...rest } = obj
+    return {
+      nutrients: Object.entries(rest).map(([k, v]) => ({ label: k, value: String(v) })),
+      ingredients: ingredients || Ingredients || '',
+    }
+  }
+  // Plain text — try comma-separated: "470, Protein: 14g, Total Fat: 22g, ..."
+  // Also handles semicolon-separated: "Calories: 160 kcal; Fat: 10g; ..."
+  const raw = String(facts)
+  const nutrients = []
+  let ingredients = ''
+  // Split on "; " or ", " (but not inside values)
+  const parts = raw.split(/;\s*|,\s*(?=[A-Z])/)
+  for (const part of parts) {
+    const trimmed = part.trim()
+    if (!trimmed) continue
+    const m = trimmed.match(/^([^:]+):\s*(.+)$/)
+    if (m) {
+      const label = m[1].trim()
+      const value = m[2].trim()
+      if (/ingredient/i.test(label)) ingredients = value
+      else nutrients.push({ label, value })
+    } else if (/^\d/.test(trimmed) && nutrients.length === 0) {
+      // First token is a bare number → treat as Calories
+      nutrients.push({ label: 'Calories', value: trimmed })
+    }
+  }
+  return { nutrients, ingredients }
+}
+
 function ProductCard({ product, shelfFolder, expanded, onToggle }) {
   const EXTENSIONS = ['jpg', 'png', 'jpeg', 'webp']
   const brandLabel = product.brand ? product.brand.split(' ')[0] : (product.name || '?').split(' ')[0]
@@ -228,6 +267,9 @@ function ProductCard({ product, shelfFolder, expanded, onToggle }) {
 
   const handleImgError = () => setAttempt((a) => a + 1)
 
+  const { nutrients, ingredients: parsedIngredients } = parseNutrition(product.nutritional_facts)
+  const ingredientsList = product.ingredients || parsedIngredients
+
   return (
     <li className="shelf-product">
       <button type="button" className="shelf-product__main" onClick={onToggle}>
@@ -250,7 +292,7 @@ function ProductCard({ product, shelfFolder, expanded, onToggle }) {
         <div className="shelf-product__info">
           <p className="shelf-product__name">{product.name || 'Unknown product'}</p>
           <p className="shelf-product__meta">
-            {[product.brand, product.category]
+            {[product.category, product.price != null ? `₹${Number(product.price).toFixed(2)}` : null]
               .filter(Boolean)
               .join(' · ')}
           </p>
@@ -269,12 +311,57 @@ function ProductCard({ product, shelfFolder, expanded, onToggle }) {
 
       {expanded && (
         <div className="shelf-product__detail">
-          {product.description && <p className="shelf-product__desc">{product.description}</p>}
-          {product.nutritional_facts && (
-            <p className="shelf-product__desc"><strong>Nutritional Facts:</strong> {product.nutritional_facts}</p>
-          )}
-          <div className="shelf-product__detail-grid">
-            {product.upc && <span><strong>UPC:</strong> {product.upc}</span>}
+          <div className="shelf-product__detail-layout">
+            {/* Large image or brand colour fallback */}
+            <div className="shelf-product__detail-img-wrap" style={{ background: color }}>
+              {showImage ? (
+                <img src={imgSrc} alt={product.name} className="shelf-product__detail-big-img" />
+              ) : (
+                <span className="shelf-product__detail-img-fallback">{brandLabel}</span>
+              )}
+            </div>
+
+            {/* Info panel */}
+            <div className="shelf-product__detail-right">
+              <div className="shelf-product__detail-title-row">
+                <p className="shelf-product__detail-name">{product.name}</p>
+                {product.price != null && (
+                  <span className="shelf-product__detail-price">₹{Number(product.price).toFixed(2)}</span>
+                )}
+              </div>
+              {product.category && (
+                <p className="shelf-product__detail-cat">{product.category}</p>
+              )}
+              {product.diet_type && (
+                <div className="shelf-product__detail-badges">
+                  <span className="shelf-product__detail-badge">🌿 {product.diet_type}</span>
+                </div>
+              )}
+              {product.description && (
+                <p className="shelf-product__detail-desc">{product.description}</p>
+              )}
+              {nutrients.length > 0 && (
+                <>
+                  <p className="shelf-product__detail-section-heading">
+                    🔥 <strong>Nutrition</strong>&nbsp;<span className="shelf-product__detail-section-sub">(per serving)</span>
+                  </p>
+                  <div className="shelf-product__nutr-grid">
+                    {nutrients.map(({ label, value }) => (
+                      <div key={label} className="shelf-product__nutr-row">
+                        <span className="shelf-product__nutr-label">{label}</span>
+                        <span className="shelf-product__nutr-value">{value}</span>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+              {ingredientsList && (
+                <>
+                  <p className="shelf-product__detail-section-heading"><strong>Ingredients</strong></p>
+                  <p className="shelf-product__detail-ingredients">{ingredientsList}</p>
+                </>
+              )}
+            </div>
           </div>
         </div>
       )}
@@ -291,6 +378,9 @@ function ShelfExperiencePage({ store, layout, onBack }) {
   const [searchTerm, setSearchTerm] = useState('')
   const [aiResponse, setAiResponse] = useState('')
   const [expandedId, setExpandedId] = useState(null)
+  const [allStoreProducts, setAllStoreProducts] = useState([])
+  const [dropdownResults, setDropdownResults] = useState([])
+  const [showDropdown, setShowDropdown] = useState(false)
   const [scanOpen, setScanOpen] = useState(false)
   const [cameraError, setCameraError] = useState('')
   const [isCameraActive, setIsCameraActive] = useState(false)
@@ -315,34 +405,40 @@ function ShelfExperiencePage({ store, layout, onBack }) {
         // Get all products listed in this shelf from the layout plan (authoritative list)
         const layoutProducts = parseProducts(layoutData)
 
-        // Fetch full product details from Cosmos
-        const allCosmosProducts = await fetchAllProductsFull()
+        // Fetch enriched details (metadata + real stock + calculated final price) for each
+        // product via the direct endpoint in parallel
+        const enrichedResults = await Promise.all(
+          layoutProducts.map(async (lp) => {
+            if (!lp.upc) return null
+            try {
+              const res = await fetchDirectProductDetails(lp.upc)
+              return (res?.status === 'success' && res?.data) ? res.data : null
+            } catch {
+              return null
+            }
+          })
+        )
 
-        // Normalize name for fuzzy matching: lowercase, strip ALL punctuation (apostrophes, hyphens, dots, etc.)
-        const normalizeName = (s) => (s || '').toLowerCase().replace(/[^a-z0-9\s()]/g, '').replace(/\s+/g, ' ').trim()
-
-        // Build lookup map: normalized name → cosmos product
-        const cosmosMap = {}
-        for (const p of allCosmosProducts) {
-          const key = normalizeName(p.Name || p.name)
-          if (key) cosmosMap[key] = p
-        }
-
-        // For every product in the shelf, use Cosmos data if name matches, else fallback to layout data
-        const shelfProducts = layoutProducts.map((lp) => {
-          const key = normalizeName(lp.name)
-          const cp = cosmosMap[key]
+        // For every product use direct endpoint data if available, else layout data
+        const shelfProducts = layoutProducts.map((lp, idx) => {
+          const dp = enrichedResults[idx]
           return {
-            id:               cp ? (cp.id || cp.UPC || cp.upc || lp.id || lp.name) : (lp.id || lp.name),
-            name:             cp ? (cp.Name || cp.name || lp.name) : lp.name,
-            layoutName:       lp.name,   // original layout name — used as image path fallback
-            brand:            cp ? (cp.Brand || cp.brand || lp.brand) : lp.brand,
-            category:         cp ? (cp.Category || cp.category || lp.category) : lp.category,
-            description:      cp ? (cp.Description || cp.description || '') : '',
-            nutritional_facts:cp ? (cp.Nutritional_Facts || cp.nutritional_facts || '') : '',
-            upc:              cp ? (cp.UPC || cp.upc || lp.upc) : lp.upc,
-            image_url:        cp ? (cp.image_url || cp.imageUrl || '') : '',
-            stock_count:      lp.stock_count,
+            id:               dp ? (dp.id || dp.UPC || dp.upc || lp.id || lp.name) : (lp.id || lp.name),
+            name:             dp ? (dp.name || dp.Name || lp.name) : lp.name,
+            layoutName:       lp.name,
+            brand:            dp ? (dp.brand || dp.Brand || lp.brand) : lp.brand,
+            category:         dp ? (dp.category || dp.Category || lp.category) : lp.category,
+            description:      dp ? (dp.description || dp.Description || '') : '',
+            nutritional_facts:dp ? (dp.nutrition || dp.Nutritional_Facts || dp.nutritional_facts || '') : '',
+            upc:              dp ? (dp.upc || dp.UPC || lp.upc) : lp.upc,
+            image_url:        dp ? (dp.image_url || dp.imageUrl || '') : '',
+            base_price:       dp ? (dp.base_price ?? null) : null,
+            price:            dp ? (dp.final_price ?? dp.base_price ?? lp.price ?? null) : (lp.price ?? null),
+            applied_promotion:dp ? (dp.applied_promotion || null) : null,
+            diet_type:        dp ? (dp.diet_type || dp.Diet_Type || dp.tags || dp.Tags || '') : '',
+            ingredients:      dp ? (dp.ingredients || dp.Ingredients || '') : '',
+            stock_status:     dp ? (dp.stock_status || '') : '',
+            stock_count:      dp ? (dp.quantity ?? dp.stock_count ?? lp.stock_count) : lp.stock_count,
           }
         })
 
@@ -357,6 +453,78 @@ function ShelfExperiencePage({ store, layout, onBack }) {
     load()
     return () => { cancelled = true }
   }, [layout.id])
+
+  // Load all store products once for the search dropdown
+  useEffect(() => {
+    fetchAllProducts()
+      .then((res) => setAllStoreProducts(res.data || []))
+      .catch(() => {})
+  }, [])
+
+  // Live-filter dropdown as user types
+  useEffect(() => {
+    const term = searchTerm.trim().toLowerCase()
+    if (!term) { setDropdownResults([]); setShowDropdown(false); return }
+    const filtered = allStoreProducts.filter((p) => {
+      const name = (p.name || '').toLowerCase()
+      const brand = (p.brand || '').toLowerCase()
+      return name.includes(term) || brand.includes(term)
+    })
+    setDropdownResults(filtered)
+    setShowDropdown(filtered.length > 0)
+  }, [searchTerm, allStoreProducts])
+
+  // When user picks a product from the dropdown:
+  // - if it's on this shelf, expand its card and show details
+  // - if not, show a message and ask AI which shelf it's in
+  const handleSelectProduct = async (storeProduct) => {
+    const pickedName = (storeProduct.name || '').toLowerCase().trim()
+    setSearchTerm(storeProduct.name || '')
+    setShowDropdown(false)
+
+    const shelfMatch = products.find(
+      (p) => (p.name || '').toLowerCase().trim() === pickedName
+    )
+
+    if (shelfMatch) {
+      const key = shelfMatch.id ?? products.indexOf(shelfMatch)
+      setExpandedId(key)
+      const lines = [
+        shelfMatch.name,
+        shelfMatch.brand        && `Brand: ${shelfMatch.brand}`,
+        shelfMatch.category     && `Category: ${shelfMatch.category}`,
+        shelfMatch.description  && `\n${shelfMatch.description}`,
+      ].filter(Boolean).join('  ·  ')
+      setAiResponse(`✅ Found on this shelf\n\n${lines}`)
+    } else {
+      setAiResponse('Searching...')
+      try {
+        const storeName = store?.name || 'this store'
+        const shelfName = layout?.name || 'this shelf'
+        const res = await sendChatQuery(
+          `The product "${storeProduct.name}" is not on "${shelfName}". Which shelf or section in ${storeName} would I find it? Please be specific.`
+        )
+        setAiResponse(
+          `⚠️ "${storeProduct.name}" is not on this shelf.\n\n` +
+          (res.answer || 'Unable to determine which shelf this product is on.')
+        )
+      } catch {
+        setAiResponse(`⚠️ "${storeProduct.name}" is not available on this shelf.`)
+      }
+    }
+  }
+
+  const handleAskAI = async () => {
+    const query = searchTerm.trim()
+    if (!query) return
+    setAiResponse('Thinking...')
+    try {
+      const res = await sendChatQuery(query)
+      setAiResponse(res.answer || JSON.stringify(res))
+    } catch (err) {
+      setAiResponse('Error: ' + err.message)
+    }
+  }
 
   const filteredProducts = searchTerm
     ? products.filter(
@@ -531,13 +699,40 @@ function ShelfExperiencePage({ store, layout, onBack }) {
             <input
               type="search"
               className="shelf-page__search"
-              placeholder="Search this shelf or store..."
+              placeholder="Search products on this shelf..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
+              onFocus={() => dropdownResults.length > 0 && setShowDropdown(true)}
+              onBlur={() => setTimeout(() => setShowDropdown(false), 150)}
+              onKeyDown={(e) => { if (e.key === 'Enter' && !showDropdown) handleAskAI() }}
+              autoComplete="off"
             />
+            {showDropdown && (
+              <ul className="shelf-page__search-dropdown" role="listbox">
+                {dropdownResults.map((product, i) => (
+                  <li
+                    key={product.id || i}
+                    role="option"
+                    className="shelf-page__search-option"
+                    onMouseDown={() => handleSelectProduct(product)}
+                  >
+                    <span className="shelf-page__search-option-name">{product.name}</span>
+                    {product.brand && <span className="shelf-page__search-option-brand">{product.brand}</span>}
+                    {products.some((p) => (p.name || '').toLowerCase() === (product.name || '').toLowerCase()) && (
+                      <span className="shelf-page__search-option-on-shelf">On shelf</span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
-          <button type="button" className="shelf-page__search-btn">
-            Search store
+          <button
+            type="button"
+            className="shelf-page__ask-btn"
+            onClick={handleAskAI}
+            disabled={!searchTerm.trim()}
+          >
+            Ask AI
           </button>
         </div>
 
