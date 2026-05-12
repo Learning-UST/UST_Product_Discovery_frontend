@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
+import * as SpeechSDK from 'microsoft-cognitiveservices-speech-sdk'
 import { fetchLayoutById } from '../../services/planogramStoresApi'
-import { fetchAllProductsFull, fetchAllProducts, fetchDirectProductDetails, sendChatQuery } from '../../services/api'
+import { fetchAllProductsFull, fetchAllProducts, fetchDirectProductDetails, getSpeechToken, sendChatQuery } from '../../services/api'
+import { fuzzyFilter } from '../../utils/fuzzySearch'
 import './styles/ShelfExperiencePage.css'
 import jsQR from "jsqr";
 
@@ -424,11 +426,14 @@ function ShelfExperiencePage({ store, layout, onBack }) {
   const [showDropdown, setShowDropdown] = useState(false)
   const [scanOpen, setScanOpen] = useState(false)
   const [cameraError, setCameraError] = useState('')
+  const [speechError, setSpeechError] = useState('')
+  const [isListening, setIsListening] = useState(false)
   const [isCameraActive, setIsCameraActive] = useState(false)
   const [capturedImage, setCapturedImage] = useState('')
   const [highlightedProduct, setHighlightedProduct] = useState('')
   const videoRef = useRef(null)
   const streamRef = useRef(null)
+  const speechRecognizerRef = useRef(null)
 
   useEffect(() => {
     let cancelled = false
@@ -523,15 +528,10 @@ function ShelfExperiencePage({ store, layout, onBack }) {
       .catch(() => {})
   }, [])
 
-  // Live-filter dropdown as user types
+  // Live-filter dropdown as user types (fuzzy — handles punctuation, typos, spacing)
   useEffect(() => {
-    const term = searchTerm.trim().toLowerCase()
-    if (!term) { setDropdownResults([]); setShowDropdown(false); return }
-    const filtered = allStoreProducts.filter((p) => {
-      const name = (p.name || '').toLowerCase()
-      const brand = (p.brand || '').toLowerCase()
-      return name.includes(term) || brand.includes(term)
-    })
+    if (!searchTerm.trim()) { setDropdownResults([]); setShowDropdown(false); return }
+    const filtered = fuzzyFilter(allStoreProducts, searchTerm)
     setDropdownResults(filtered)
     setShowDropdown(filtered.length > 0)
   }, [searchTerm, allStoreProducts])
@@ -591,14 +591,7 @@ function ShelfExperiencePage({ store, layout, onBack }) {
     }
   }
 
-  const filteredProducts = searchTerm
-    ? products.filter(
-        (p) =>
-          p.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          p.brand?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          p.category?.toLowerCase().includes(searchTerm.toLowerCase())
-      )
-    : products
+  const filteredProducts = searchTerm ? fuzzyFilter(products, searchTerm) : products
 
   const toggleProduct = (key) => {
     setExpandedId((prev) => (prev === key ? null : key))
@@ -695,6 +688,74 @@ function ShelfExperiencePage({ store, layout, onBack }) {
       if (streamRef.current) streamRef.current.getTracks().forEach((track) => track.stop())
     }
   }, [])
+
+  useEffect(() => {
+    return () => {
+      if (speechRecognizerRef.current) {
+        speechRecognizerRef.current.close()
+        speechRecognizerRef.current = null
+      }
+    }
+  }, [])
+
+  const handleVoiceSearch = async () => {
+    if (!window.isSecureContext && window.location.hostname !== 'localhost') {
+      setSpeechError('Voice search requires a secure context or localhost.')
+      return
+    }
+
+    try {
+      setSpeechError('')
+      setIsListening(true)
+
+      if (speechRecognizerRef.current) {
+        speechRecognizerRef.current.close()
+        speechRecognizerRef.current = null
+      }
+
+      const { token, key, region } = await getSpeechToken()
+      const authToken = token || key
+      if (!authToken || !region) {
+        throw new Error('Speech token response was incomplete.')
+      }
+
+      const speechConfig = SpeechSDK.SpeechConfig.fromAuthorizationToken(authToken, region)
+      speechConfig.speechRecognitionLanguage = 'en-US'
+
+      const audioConfig = SpeechSDK.AudioConfig.fromDefaultMicrophoneInput()
+      const recognizer = new SpeechSDK.SpeechRecognizer(speechConfig, audioConfig)
+      speechRecognizerRef.current = recognizer
+
+      recognizer.recognizeOnceAsync(
+        (result) => {
+          if (result.reason === SpeechSDK.ResultReason.RecognizedSpeech && result.text) {
+            setSearchTerm(result.text)
+          } else if (result.reason === SpeechSDK.ResultReason.NoMatch) {
+            setSpeechError('No speech was recognized. Please try again.')
+          } else if (result.reason === SpeechSDK.ResultReason.Canceled) {
+            setSpeechError('Voice search was canceled. Please try again.')
+          }
+
+          recognizer.close()
+          if (speechRecognizerRef.current === recognizer) {
+            speechRecognizerRef.current = null
+          }
+          setIsListening(false)
+        },
+        (err) => {
+          setSpeechError(err?.message || 'Voice search failed. Please try again.')
+          recognizer.close()
+          if (speechRecognizerRef.current === recognizer) {
+            speechRecognizerRef.current = null
+          }
+          setIsListening(false)
+        }
+      )
+    } catch (err) {
+      setSpeechError(err?.message || 'Voice search failed. Please try again.')
+      setIsListening(false)
+    }
+  }
 
   // The API response wraps layout_data; preview_image is not returned by this endpoint.
   // We display the 3D planogram viewer via iframe and fall back to a placeholder.
@@ -806,6 +867,21 @@ function ShelfExperiencePage({ store, layout, onBack }) {
               onKeyDown={(e) => { if (e.key === 'Enter' && !showDropdown) handleAskAI() }}
               autoComplete="off"
             />
+            <button
+              type="button"
+              className={`shelf-page__mic-btn ${isListening ? 'is-listening' : ''}`}
+              aria-label={isListening ? 'Listening...' : 'Voice search'}
+              onClick={handleVoiceSearch}
+              disabled={isListening}
+              title={isListening ? 'Listening...' : 'Click to search by voice'}
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+                <rect x="9" y="3" width="6" height="11" rx="3" />
+                <path d="M6.5 11v1.2a5.5 5.5 0 0 0 11 0V11" strokeLinecap="round" />
+                <path d="M12 18v3M9 21h6" strokeLinecap="round" />
+              </svg>
+              {isListening && <span className="shelf-page__mic-pulse" aria-hidden="true" />}
+            </button>
             {showDropdown && (
               <ul className="shelf-page__search-dropdown" role="listbox">
                 {dropdownResults.map((product, i) => (
@@ -834,6 +910,7 @@ function ShelfExperiencePage({ store, layout, onBack }) {
             Ask AI
           </button>
         </div>
+        {speechError && <p className="shelf-page__status shelf-page__status--voice">{speechError}</p>}
 
         <textarea
           className="shelf-page__ai-response"

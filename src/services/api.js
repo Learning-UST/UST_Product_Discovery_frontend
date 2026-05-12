@@ -53,6 +53,13 @@ export const sendChatQuery = async (query) => {
 };
 
 export const getSpeechToken = async () => {
-    const response = await fetch(`${FLASK_BASE_URL}/get-speech-token`);
-    return response.json();
+    const response = await fetch(`${FLASK_BASE_URL}/speech-to-text`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+    });
+    const data = await response.json();
+    return {
+        ...data,
+        key: data.token || data.key || '',
+    };
 };
