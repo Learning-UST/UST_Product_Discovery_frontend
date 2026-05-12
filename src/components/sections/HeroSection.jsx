@@ -24,14 +24,16 @@ function HeroSection({ onStoresClick, onFeaturesClick }) {
 
       <div className="hero-product" aria-label="Featured product preview">
         <div className="hero-product__preview">
-          <div className="hero-product__icon" aria-hidden="true">
-            Cart
-          </div>
+          <img
+            src="/images/Starbucks_Doubleshot_Energy_Coffee_Mocha.png"
+            alt="Featured drink"
+            className="hero-product__image"
+          />
         </div>
         <div className="hero-product__details">
-          <h3 className="hero-product__name">Oat Milk Latte</h3>
+          <h3 className="hero-product__name">Starbucks Doubleshot Energy Coffee Mocha (15 fl oz)</h3>
           <p className="hero-product__meta">Your shelf favorite</p>
-          <span className="hero-product__price">$4.20</span>
+          <span className="hero-product__price">₹120.00</span>
         </div>
       </div>
     </section>
