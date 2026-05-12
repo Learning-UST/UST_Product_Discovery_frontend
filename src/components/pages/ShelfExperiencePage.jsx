@@ -424,6 +424,7 @@ function ShelfExperiencePage({ store, layout, onBack }) {
   const [allStoreProducts, setAllStoreProducts] = useState([])
   const [dropdownResults, setDropdownResults] = useState([])
   const [showDropdown, setShowDropdown] = useState(false)
+  const [selectedProducts, setSelectedProducts] = useState([])
   const [scanOpen, setScanOpen] = useState(false)
   const [cameraError, setCameraError] = useState('')
   const [speechError, setSpeechError] = useState('')
@@ -536,12 +537,36 @@ function ShelfExperiencePage({ store, layout, onBack }) {
     setShowDropdown(filtered.length > 0)
   }, [searchTerm, allStoreProducts])
 
+  const getSelectedProductLabels = () =>
+    selectedProducts
+      .map((product) => product.name || product.product_name || product.ProductName || '')
+      .filter(Boolean)
+
+  const queryMentionsSelectedProduct = (query, productLabels) => {
+    const normalizedQuery = query.toLowerCase()
+    return productLabels.some((label) => {
+      const normalizedLabel = label.toLowerCase().trim()
+      return normalizedLabel && normalizedQuery.includes(normalizedLabel)
+    })
+  }
+
   // When user picks a product from the dropdown:
   // - if it's on this shelf, expand its card and show details
   // - if not, show a message and ask AI which shelf it's in
   const handleSelectProduct = async (storeProduct) => {
     const pickedName = (storeProduct.name || '').toLowerCase().trim()
-    setSearchTerm(storeProduct.name || '')
+    const selectedLabel = storeProduct.name || ''
+
+    setSelectedProducts((prev) => {
+      const selectedId = storeProduct.id || storeProduct.name || storeProduct.product_name
+      const alreadySelected = prev.find((product) => (product.id || product.name || product.product_name) === selectedId)
+      const updated = alreadySelected
+        ? prev.filter((product) => (product.id || product.name || product.product_name) !== selectedId)
+        : [...prev, storeProduct]
+      setSearchTerm(updated.map((product) => product.name || product.product_name || '').join(', '))
+      return updated
+    })
+
     setShowDropdown(false)
 
     const shelfMatch = products.find(
@@ -567,24 +592,40 @@ function ShelfExperiencePage({ store, layout, onBack }) {
         const storeName = store?.name || 'this store'
         const shelfName = layout?.name || 'this shelf'
         const res = await sendChatQuery(
-          `The product "${storeProduct.name}" is not on "${shelfName}". Which shelf or section in ${storeName} would I find it? Please be specific.`
+          `The product "${selectedLabel}" is not on "${shelfName}". Which shelf or section in ${storeName} would I find it? Please be specific.`
         )
         setAiResponse(
-          `⚠️ "${storeProduct.name}" is not on this shelf.\n\n` +
+          `⚠️ "${selectedLabel}" is not on this shelf.\n\n` +
           (res.answer || 'Unable to determine which shelf this product is on.')
         )
       } catch {
-        setAiResponse(`⚠️ "${storeProduct.name}" is not available on this shelf.`)
+        setAiResponse(`⚠️ "${selectedLabel}" is not available on this shelf.`)
       }
     }
+  }
+
+  const removeSelected = (product) => {
+    const selectedId = product.id || product.name || product.product_name
+    setSelectedProducts((prev) => {
+      const updated = prev.filter((item) => (item.id || item.name || item.product_name) !== selectedId)
+      setSearchTerm(updated.map((item) => item.name || item.product_name || '').join(', '))
+      return updated
+    })
   }
 
   const handleAskAI = async () => {
     const query = searchTerm.trim()
     if (!query) return
+
+    const selectedLabels = getSelectedProductLabels()
+    const scopedQuery =
+      selectedLabels.length > 0 && !queryMentionsSelectedProduct(query, selectedLabels)
+        ? `Answer only for these selected shelf products: ${selectedLabels.join(', ')}. User question: ${query}`
+        : query
+
     setAiResponse('Thinking...')
     try {
-      const res = await sendChatQuery(query)
+      const res = await sendChatQuery(scopedQuery)
       setAiResponse(res.answer || JSON.stringify(res))
     } catch (err) {
       setAiResponse('Error: ' + err.message)
@@ -849,6 +890,29 @@ function ShelfExperiencePage({ store, layout, onBack }) {
 
       {/* ── Body ── */}
       <div className="shelf-page__body">
+        {/* Selected product chips */}
+        {selectedProducts.length > 0 && (
+          <div className="shelf-page__chips">
+            {selectedProducts.map((product) => {
+              const id = product.id || product.name || product.product_name
+              const label = product.name || product.product_name || id
+              return (
+                <span key={id} className="shelf-page__chip">
+                  {label}
+                  <button
+                    type="button"
+                    className="shelf-page__chip-remove"
+                    onClick={() => removeSelected(product)}
+                    aria-label={`Remove ${label}`}
+                  >
+                    &#x2715;
+                  </button>
+                </span>
+              )
+            })}
+          </div>
+        )}
+
         {/* Search row */}
         <div className="shelf-page__search-row">
           <div className="shelf-page__search-wrap">
@@ -861,7 +925,10 @@ function ShelfExperiencePage({ store, layout, onBack }) {
               className="shelf-page__search"
               placeholder="Search products on this shelf..."
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={(e) => {
+                setSearchTerm(e.target.value)
+                setAiResponse('')
+              }}
               onFocus={() => dropdownResults.length > 0 && setShowDropdown(true)}
               onBlur={() => setTimeout(() => setShowDropdown(false), 150)}
               onKeyDown={(e) => { if (e.key === 'Enter' && !showDropdown) handleAskAI() }}
@@ -896,20 +963,25 @@ function ShelfExperiencePage({ store, layout, onBack }) {
                     &#x2715;
                   </button>
                 </li>
-                {dropdownResults.map((product, i) => (
-                  <li
-                    key={product.id || i}
-                    role="option"
-                    className="shelf-page__search-option"
-                    onMouseDown={() => handleSelectProduct(product)}
-                  >
-                    <span className="shelf-page__search-option-name">{product.name}</span>
-                    {product.brand && <span className="shelf-page__search-option-brand">{product.brand}</span>}
-                    {products.some((p) => (p.name || '').toLowerCase() === (product.name || '').toLowerCase()) && (
-                      <span className="shelf-page__search-option-on-shelf">On shelf</span>
-                    )}
-                  </li>
-                ))}
+                {dropdownResults.map((product, i) => {
+                  const selected = selectedProducts.some((item) => (item.id || item.name || item.product_name) === (product.id || product.name || product.product_name))
+                  return (
+                    <li
+                      key={product.id || i}
+                      role="option"
+                      aria-selected={selected}
+                      className={`shelf-page__search-option${selected ? ' is-selected' : ''}`}
+                      onMouseDown={() => handleSelectProduct(product)}
+                    >
+                      <span className="shelf-page__search-option-name">{product.name}</span>
+                      {product.brand && <span className="shelf-page__search-option-brand">{product.brand}</span>}
+                      {products.some((p) => (p.name || '').toLowerCase() === (product.name || '').toLowerCase()) && (
+                        <span className="shelf-page__search-option-on-shelf">On shelf</span>
+                      )}
+                      {selected && <span className="shelf-page__search-option-check">&#10003;</span>}
+                    </li>
+                  )
+                })}
               </ul>
             )}
           </div>
