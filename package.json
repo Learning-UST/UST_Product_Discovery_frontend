@@ -12,6 +12,7 @@
   "dependencies": {
     "@react-three/drei": "^10.7.7",
     "@react-three/fiber": "^9.6.1",
+    "jsqr": "^1.4.0",
     "microsoft-cognitiveservices-speech-sdk": "^1.49.0",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",

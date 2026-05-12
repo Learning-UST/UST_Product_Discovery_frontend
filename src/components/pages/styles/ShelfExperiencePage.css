@@ -912,3 +912,40 @@
     display: none;
   }
 }
+/* --- Viewer iframe support (keeps old class for backward compatibility) --- */
+.shelf-page__viewer-frame,
+.shelf-page__viewer-iframe {
+  width: 100%;
+  height: 420px;
+  border: 0;
+  display: block;
+  background: #fff;
+}
+
+@media (width <= 640px) {
+  .shelf-page__viewer-frame,
+  .shelf-page__viewer-iframe {
+    height: 260px;
+  }
+}
+
+/* --- Product card highlight state from parent search/selection --- */
+.shelf-product.is-highlighted {
+  border-color: #70d48b;
+  box-shadow:
+    0 0 0 2px #22c55e33,
+    0 6px 18px #00000010;
+  background: linear-gradient(180deg, #ffffff 0%, #f6fff8 100%);
+}
+
+.shelf-product.is-highlighted .shelf-product__name {
+  color: #0c5f35;
+}
+
+.shelf-product.is-highlighted .shelf-product__meta {
+  color: #3d7a58;
+}
+
+.shelf-product.is-highlighted .shelf-product__badge--in {
+  background: #0f9f57;
+}
