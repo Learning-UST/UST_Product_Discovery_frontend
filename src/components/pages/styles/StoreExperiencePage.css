@@ -390,6 +390,14 @@
   font-size: 0.95rem;
 }
 
+.store-page__qr-message {
+  margin: 0.75rem 0 0;
+  color: #1b6a4a;
+  font-family: 'Manrope', sans-serif;
+  font-size: 0.95rem;
+  font-weight: 500;
+}
+
 .store-page__select-row {
   display: flex;
   gap: 0.6rem;

@@ -1,5 +1,7 @@
-// Replace your old API base with the Flask URL
-const FLASK_BASE_URL = 'http://127.0.0.1:5000';
+// Base URL for the Flask backend.
+// Override with VITE_FLASK_API_BASE when deploying (e.g. https://your-domain.com/flask-api).
+// NEVER use 127.0.0.1 in production — browsers block public→loopback requests.
+const FLASK_BASE_URL = (import.meta.env.VITE_FLASK_API_BASE || 'http://127.0.0.1:5000').replace(/\/$/, '');
 
 export const fetchAllProductsFull = async () => {
     const response = await fetch(`${FLASK_BASE_URL}/api/products`);

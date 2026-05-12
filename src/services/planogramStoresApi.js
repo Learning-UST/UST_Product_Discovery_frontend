@@ -1363,24 +1363,9 @@ export const fetchPlanogramStores = async ({ identity } = {}) => {
     }
 
     const { requestTimeoutMs } = getStoreScanConfig()
-
-    // 2. Try GET /api/stores (returns all stores in one request, no 404 spam)
-    try {
-        const allStores = await fetchJsonWithTimeout('/api/stores', {}, requestTimeoutMs)
-        const storeList = toArray(allStores)
-        if (storeList.length > 0) {
-            writeStoresCache(storeList)
-            return {
-                stores: storeList.map(mapStoreForUi),
-                hasIdentity: true,
-            }
-        }
-    } catch {
-        // Server may require identity params — fall through to identity-scoped fetch
-    }
-
-    // 3. Try with identity params (userId / username)
     const resolvedIdentity = resolveIdentity(identity)
+
+    // 2. Try GET /api/stores with identity params (avoids 400 from unauthenticated call)
     if (resolvedIdentity) {
         try {
             const stores = await fetchJsonWithTimeout('/api/stores', {
@@ -1395,11 +1380,26 @@ export const fetchPlanogramStores = async ({ identity } = {}) => {
                 }
             }
         } catch {
-            // Fall through to ID scan as last resort
+            // Fall through
         }
     }
 
-    // 4. Last resort: ID scan (generates 404s for missing IDs — avoided when possible)
+    // 3. Try bare GET /api/stores (works if backend allows unauthenticated listing)
+    try {
+        const allStores = await fetchJsonWithTimeout('/api/stores', {}, requestTimeoutMs)
+        const storeList = toArray(allStores)
+        if (storeList.length > 0) {
+            writeStoresCache(storeList)
+            return {
+                stores: storeList.map(mapStoreForUi),
+                hasIdentity: true,
+            }
+        }
+    } catch {
+        // Fall through to ID scan as absolute last resort
+    }
+
+    // 4. Last resort: ID scan — only runs when both REST calls above fail entirely
     const discoveredStores = await discoverAllStoresByIdScan()
     if (discoveredStores.length > 0) {
         writeStoresCache(discoveredStores)

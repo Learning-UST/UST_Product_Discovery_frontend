@@ -1,7 +1,39 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import './styles/StoreExperiencePage.css'
 import { getSpeechToken, fetchAllProducts, fetchDirectProductDetails, sendChatQuery } from '../../services/api'
-import * as SpeechSDK from 'microsoft-cognitiveservices-speech-sdk';
+import * as SpeechSDK from 'microsoft-cognitiveservices-speech-sdk'
+import jsQR from 'jsqr'
+import { fuzzyFilter } from '../../utils/fuzzySearch'
+
+const trimValue = (value) => (typeof value === 'string' ? value.trim() : '')
+
+const extractShelfIdFromQrText = (rawValue) => {
+  const value = trimValue(rawValue)
+  if (!value) {
+    return ''
+  }
+
+  // If it's just a number, return it
+  if (/^\d+$/.test(value)) {
+    return value
+  }
+
+  // Try parsing as URL
+  try {
+    const parsed = new URL(value)
+    return (
+      trimValue(parsed.searchParams.get('shelfId')) ||
+      trimValue(parsed.searchParams.get('layoutId')) ||
+      trimValue(parsed.searchParams.get('savedLayoutId')) ||
+      trimValue(parsed.searchParams.get('shelf')) ||
+      ''
+    )
+  } catch {
+    // Try extracting from query string format
+    const match = value.match(/(?:shelfId|layoutId|savedLayoutId|shelf)=([^&]+)/i)
+    return match?.[1] ? decodeURIComponent(match[1]).trim() : ''
+  }
+}
 
 function StoreExperiencePage({ store, onChangeStore, onLayoutSelect }) {
   const [activeTab, setActiveTab] = useState('scan')
@@ -18,9 +50,13 @@ function StoreExperiencePage({ store, onChangeStore, onLayoutSelect }) {
   const [productLoadError, setProductLoadError] = useState('')
   const [isListening, setIsListening] = useState(false)
   const [speechError, setSpeechError] = useState('')
+  const [qrError, setQrError] = useState('')
+  const [qrScanned, setQrScanned] = useState(false)
   const videoRef = useRef(null)
   const streamRef = useRef(null)
   const speechRecognizerRef = useRef(null)
+  const canvasRef = useRef(null)
+  const qrScanLoopRef = useRef(null)
 
   const shelfOptions = useMemo(() => {
     const layoutNames = Array.isArray(store.layouts)
@@ -55,6 +91,90 @@ function StoreExperiencePage({ store, onChangeStore, onLayoutSelect }) {
     }
   }, [])
 
+  // QR Scanning Loop - runs continuously while camera is active
+  useEffect(() => {
+    if (!isCameraActive || !videoRef.current || !canvasRef.current || qrScanned) {
+      return
+    }
+
+    const scanQR = () => {
+      if (!videoRef.current || !canvasRef.current || qrScanned) {
+        return
+      }
+
+      const video = videoRef.current
+      const canvas = canvasRef.current
+      const context = canvas.getContext('2d')
+
+      // Only scan if video is ready
+      if (video.readyState !== video.HAVE_ENOUGH_DATA) {
+        qrScanLoopRef.current = requestAnimationFrame(scanQR)
+        return
+      }
+
+      // Set canvas size to match video
+      canvas.width = video.videoWidth
+      canvas.height = video.videoHeight
+
+      // Draw current video frame to canvas
+      context.drawImage(video, 0, 0, canvas.width, canvas.height)
+
+      // Get image data and scan for QR
+      try {
+        const imageData = context.getImageData(0, 0, canvas.width, canvas.height)
+        const code = jsQR(imageData.data, imageData.width, imageData.height)
+
+        if (code) {
+          // QR code detected!
+          const shelfId = extractShelfIdFromQrText(code.data)
+          if (shelfId) {
+            setQrScanned(true)
+            setQrError('')
+            
+            // Find and select the layout by ID or name
+            const layout = Array.isArray(store.layouts)
+              ? store.layouts.find((l) => String(l.id) === shelfId || l.name === shelfId)
+              : null
+
+            if (layout && onLayoutSelect) {
+              // Stop camera and navigate
+              stopCamera()
+              onLayoutSelect(layout)
+            } else {
+              // If layout not found by ID, treat it as shelf name
+              setSelectedShelf(shelfId)
+              setQrError(`Shelf ID found: ${shelfId}. Redirecting...`)
+              stopCamera()
+              setTimeout(() => {
+                const matchedLayout = Array.isArray(store.layouts)
+                  ? store.layouts.find((l) => l.name === shelfId)
+                  : null
+                if (matchedLayout && onLayoutSelect) {
+                  onLayoutSelect(matchedLayout)
+                }
+              }, 500)
+            }
+            return
+          }
+        }
+      } catch (error) {
+        // Silently continue scanning on error
+      }
+
+      // Continue scanning
+      qrScanLoopRef.current = requestAnimationFrame(scanQR)
+    }
+
+    qrScanLoopRef.current = requestAnimationFrame(scanQR)
+
+    return () => {
+      if (qrScanLoopRef.current) {
+        cancelAnimationFrame(qrScanLoopRef.current)
+        qrScanLoopRef.current = null
+      }
+    }
+  }, [isCameraActive, qrScanned, store.layouts, onLayoutSelect])
+
   useEffect(() => {
     const attachStream = async () => {
       if (!isCameraActive || !videoRef.current || !streamRef.current) {
@@ -81,6 +201,8 @@ function StoreExperiencePage({ store, onChangeStore, onLayoutSelect }) {
 
     try {
       setCameraError('')
+      setQrError('')
+      setQrScanned(false)
 
       if (streamRef.current) {
         streamRef.current.getTracks().forEach((track) => track.stop())
@@ -133,6 +255,29 @@ function StoreExperiencePage({ store, onChangeStore, onLayoutSelect }) {
     context.drawImage(video, 0, 0, canvas.width, canvas.height)
     setCapturedImage(canvas.toDataURL('image/png'))
     stopCamera()
+  }
+
+  const handleRetake = async () => {
+    setCapturedImage('')
+    await startCamera()
+  }
+
+  const stopCamera = () => {
+    if (qrScanLoopRef.current) {
+      cancelAnimationFrame(qrScanLoopRef.current)
+      qrScanLoopRef.current = null
+    }
+
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop())
+      streamRef.current = null
+    }
+
+    if (videoRef.current) {
+      videoRef.current.srcObject = null
+    }
+
+    setIsCameraActive(false)
   }
 
   const handleSearchSubmit = async () => {
@@ -312,24 +457,6 @@ function StoreExperiencePage({ store, onChangeStore, onLayoutSelect }) {
     }
   }
 
-  const handleRetake = async () => {
-    setCapturedImage('')
-    await startCamera()
-  }
-
-  const stopCamera = () => {
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach((track) => track.stop())
-      streamRef.current = null
-    }
-
-    if (videoRef.current) {
-      videoRef.current.srcObject = null
-    }
-
-    setIsCameraActive(false)
-  }
-
   return (
     <div className="store-page">
       <header className="store-page__hero">
@@ -374,9 +501,12 @@ function StoreExperiencePage({ store, onChangeStore, onLayoutSelect }) {
 
             {cameraError ? <p className="store-page__error">{cameraError}</p> : null}
 
+            {qrError ? <p className="store-page__qr-message">{qrError}</p> : null}
+
             {isCameraActive ? (
               <div className="store-page__camera-wrap">
                 <video ref={videoRef} autoPlay playsInline muted className="store-page__camera" />
+                <canvas ref={canvasRef} style={{ display: 'none' }} />
                 <div className="store-page__camera-actions">
                   <button type="button" className="store-page__capture-btn" onClick={captureFrame}>
                     Capture
