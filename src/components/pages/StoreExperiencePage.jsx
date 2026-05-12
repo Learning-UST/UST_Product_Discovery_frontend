@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import './styles/StoreExperiencePage.css'
 import { getSpeechToken, fetchAllProducts, fetchDirectProductDetails, sendChatQuery } from '../../services/api'
 import * as SpeechSDK from 'microsoft-cognitiveservices-speech-sdk';
-import { fetchAllProducts, fetchDirectProductDetails, sendChatQuery } from '../../services/api'
+
 function StoreExperiencePage({ store, onChangeStore, onLayoutSelect }) {
   const [activeTab, setActiveTab] = useState('scan')
   const [cameraError, setCameraError] = useState('')
