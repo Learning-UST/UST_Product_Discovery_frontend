@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import './styles/StoreExperiencePage.css'
 import * as SpeechSDK from 'microsoft-cognitiveservices-speech-sdk';
-import { fetchAllProducts, fetchDirectProductDetails, sendChatQuery } from '../../services/api'
+import { fetchAllProducts, fetchDirectProductDetails, getSpeechToken, sendChatQuery } from '../../services/api'
+import { fuzzyFilter } from '../../utils/fuzzySearch'
 function StoreExperiencePage({ store, onChangeStore, onLayoutSelect }) {
   const [activeTab, setActiveTab] = useState('scan')
   const [cameraError, setCameraError] = useState('')
@@ -15,8 +16,11 @@ function StoreExperiencePage({ store, onChangeStore, onLayoutSelect }) {
   const [selectedProducts, setSelectedProducts] = useState([])
   const [showDropdown, setShowDropdown] = useState(false)
   const [productLoadError, setProductLoadError] = useState('')
+  const [isListening, setIsListening] = useState(false)
+  const [speechError, setSpeechError] = useState('')
   const videoRef = useRef(null)
   const streamRef = useRef(null)
+  const speechRecognizerRef = useRef(null)
 
   const shelfOptions = useMemo(() => {
     const layoutNames = Array.isArray(store.layouts)
@@ -38,6 +42,15 @@ function StoreExperiencePage({ store, onChangeStore, onLayoutSelect }) {
     return () => {
       if (streamRef.current) {
         streamRef.current.getTracks().forEach((track) => track.stop())
+      }
+    }
+  }, [])
+
+  useEffect(() => {
+    return () => {
+      if (speechRecognizerRef.current) {
+        speechRecognizerRef.current.close()
+        speechRecognizerRef.current = null
       }
     }
   }, [])
@@ -141,19 +154,56 @@ function StoreExperiencePage({ store, onChangeStore, onLayoutSelect }) {
 };
 
   const handleVoiceSearch = async () => {
-    const { key, region } = await getSpeechToken();
-    const speechConfig = SpeechSDK.SpeechConfig.fromSubscription(key, region);
-    const audioConfig = SpeechSDK.AudioConfig.fromDefaultMicrophoneInput();
-    const recognizer = new SpeechSDK.SpeechRecognizer(speechConfig, audioConfig);
+    if (!window.isSecureContext && window.location.hostname !== 'localhost') {
+      setSpeechError('Voice search requires a secure context or localhost.')
+      return
+    }
+    try {
+      setSpeechError('')
+      setIsListening(true)
 
-    recognizer.recognizeOnceAsync(result => {
-        if (result.reason === SpeechSDK.ResultReason.RecognizedSpeech) {
-            setSearchTerm(result.text); // Automatically fills the search bar
-            // Trigger the Agentic Search
-            handleAgenticSearch(result.text);
+      if (speechRecognizerRef.current) {
+        speechRecognizerRef.current.close()
+        speechRecognizerRef.current = null
+      }
+
+      const { token, key, region } = await getSpeechToken()
+      const authToken = token || key
+      if (!authToken || !region) {
+        throw new Error('Speech token response was incomplete.')
+      }
+
+      const speechConfig = SpeechSDK.SpeechConfig.fromAuthorizationToken(authToken, region)
+      speechConfig.speechRecognitionLanguage = 'en-US'
+      const audioConfig = SpeechSDK.AudioConfig.fromDefaultMicrophoneInput()
+      const recognizer = new SpeechSDK.SpeechRecognizer(speechConfig, audioConfig)
+      speechRecognizerRef.current = recognizer
+
+      recognizer.recognizeOnceAsync(
+        (result) => {
+          if (result.reason === SpeechSDK.ResultReason.RecognizedSpeech && result.text) {
+            setSearchTerm(result.text)
+          } else if (result.reason === SpeechSDK.ResultReason.NoMatch) {
+            setSpeechError('No speech was recognized. Please try again.')
+          } else if (result.reason === SpeechSDK.ResultReason.Canceled) {
+            setSpeechError('Voice search was canceled. Please try again.')
+          }
+          recognizer.close()
+          if (speechRecognizerRef.current === recognizer) speechRecognizerRef.current = null
+          setIsListening(false)
+        },
+        (err) => {
+          setSpeechError(err?.message || 'Voice search failed. Please try again.')
+          recognizer.close()
+          if (speechRecognizerRef.current === recognizer) speechRecognizerRef.current = null
+          setIsListening(false)
         }
-    });
-};
+      )
+    } catch (err) {
+      setSpeechError(err?.message || 'Voice search failed. Please try again.')
+      setIsListening(false)
+    }
+  }
 
   // Load all products whenever Search tab is opened
   useEffect(() => {
@@ -170,16 +220,10 @@ function StoreExperiencePage({ store, onChangeStore, onLayoutSelect }) {
       .catch((err) => setProductLoadError('Failed to reach product API: ' + err.message))
   }, [activeTab])
 
-  // Filter products as user types
+  // Filter products as user types (fuzzy — handles punctuation, typos, spacing)
   useEffect(() => {
-    const term = searchTerm.trim().toLowerCase()
-    if (!term) { setSearchResults([]); setShowDropdown(false); return }
-    const filtered = allProducts.filter((p) => {
-      // Check both capitalized (raw Cosmos) and lowercase field names
-      const name = (p.Name || p.name || p.product_name || '').toLowerCase()
-      const brand = (p.Brand || p.brand || '').toLowerCase()
-      return name.includes(term) || brand.includes(term)
-    })
+    if (!searchTerm.trim()) { setSearchResults([]); setShowDropdown(false); return }
+    const filtered = fuzzyFilter(allProducts, searchTerm)
     setSearchResults(filtered)
     setShowDropdown(filtered.length > 0)
   }, [searchTerm, allProducts])
@@ -425,6 +469,21 @@ function StoreExperiencePage({ store, onChangeStore, onLayoutSelect }) {
                 placeholder="Search products or ask a question..."
                 autoComplete="off"
               />
+              <button
+                type="button"
+                className={`store-page__mic-btn ${isListening ? 'is-listening' : ''}`}
+                aria-label={isListening ? 'Listening...' : 'Voice search'}
+                onClick={handleVoiceSearch}
+                disabled={isListening}
+                title={isListening ? 'Listening...' : 'Click to search by voice'}
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+                  <rect x="9" y="3" width="6" height="11" rx="3" />
+                  <path d="M6.5 11v1.2a5.5 5.5 0 0 0 11 0V11" strokeLinecap="round" />
+                  <path d="M12 18v3M9 21h6" strokeLinecap="round" />
+                </svg>
+                {isListening && <span className="store-page__mic-pulse" aria-hidden="true" />}
+              </button>
               {productLoadError && (
                 <p className="store-page__error" style={{ marginTop: '0.4rem', fontSize: '0.82rem' }}>
                   {productLoadError}
@@ -454,6 +513,8 @@ function StoreExperiencePage({ store, onChangeStore, onLayoutSelect }) {
                 </ul>
               )}
             </div>
+
+            {speechError && <p className="store-page__speech-error">{speechError}</p>}
 
             <button
               type="button"
