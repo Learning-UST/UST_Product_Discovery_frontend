@@ -884,6 +884,18 @@ function ShelfExperiencePage({ store, layout, onBack }) {
             </button>
             {showDropdown && (
               <ul className="shelf-page__search-dropdown" role="listbox">
+                <li className="shelf-page__search-dropdown-header">
+                  <span className="shelf-page__search-dropdown-title">Results</span>
+                  <button
+                    type="button"
+                    className="shelf-page__search-dropdown-close"
+                    aria-label="Close dropdown"
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={() => setShowDropdown(false)}
+                  >
+                    &#x2715;
+                  </button>
+                </li>
                 {dropdownResults.map((product, i) => (
                   <li
                     key={product.id || i}

@@ -621,6 +621,18 @@ function StoreExperiencePage({ store, onChangeStore, onLayoutSelect }) {
               )}
               {showDropdown && (
                 <ul className="store-page__search-dropdown" role="listbox">
+                  <li className="store-page__search-dropdown-header">
+                    <span className="store-page__search-dropdown-title">Results</span>
+                    <button
+                      type="button"
+                      className="store-page__search-dropdown-close"
+                      aria-label="Close dropdown"
+                      onMouseDown={(event) => event.preventDefault()}
+                      onClick={() => setShowDropdown(false)}
+                    >
+                      &#x2715;
+                    </button>
+                  </li>
                   {searchResults.map((product, i) => {
                     const id = product.id || product._id || product.UPC || product.upc || i
                     const label = product.Name || product.name || product.product_name || product.ProductName || String(id)
