@@ -2,7 +2,48 @@ import { useEffect, useRef, useState } from 'react'
 import { fetchLayoutById } from '../../services/planogramStoresApi'
 import { fetchAllProductsFull, fetchAllProducts, fetchDirectProductDetails, sendChatQuery } from '../../services/api'
 import './styles/ShelfExperiencePage.css'
+import jsQR from "jsqr";
 
+const trimValue = (value) => (typeof value === 'string' ? value.trim() : '')
+
+const extractShelfIdFromQrText = (rawValue) => {
+  const value = trimValue(rawValue)
+  if (!value) {
+    return ''
+  }
+
+  if (/^\d+$/.test(value)) {
+    return value
+  }
+
+  try {
+    const parsed = new URL(value)
+    return (
+      trimValue(parsed.searchParams.get('shelfId')) ||
+      trimValue(parsed.searchParams.get('layoutId')) ||
+      trimValue(parsed.searchParams.get('savedLayoutId')) ||
+      trimValue(parsed.searchParams.get('shelf')) ||
+      ''
+    )
+  } catch {
+    const match = value.match(/(?:shelfId|layoutId|savedLayoutId|shelf)=([^&]+)/i)
+    return match?.[1] ? decodeURIComponent(match[1]).trim() : ''
+  }
+}
+
+const redirectToShelfById = (shelfId) => {
+  if (!shelfId) {
+    return
+  }
+
+  const target = new URL(window.location.href)
+  target.searchParams.set('shelfId', shelfId)
+  target.searchParams.delete('layoutId')
+  target.searchParams.delete('savedLayoutId')
+  target.searchParams.delete('shelf')
+
+  window.location.assign(target.toString())
+}
 const KNOWN_BRAND_COLORS = {
   "lay's": '#F5C400',
   'lays': '#F5C400',
@@ -609,6 +650,28 @@ function ShelfExperiencePage({ store, layout, onBack }) {
     const context = canvas.getContext('2d')
     if (!context) { setCameraError('Capture failed.'); return }
     context.drawImage(video, 0, 0, canvas.width, canvas.height)
+
+    try {
+      const imageData = context.getImageData(0, 0, canvas.width, canvas.height)
+      const qrResult = jsQR(imageData.data, imageData.width, imageData.height)
+
+      if (qrResult?.data) {
+        const shelfId = extractShelfIdFromQrText(qrResult.data)
+        if (shelfId) {
+          stopCamera()
+          setScanOpen(false)
+          redirectToShelfById(shelfId)
+          return
+        }
+
+        setCameraError('QR scanned, but no valid shelfId was found in the QR content.')
+      } else {
+        setCameraError('No QR code detected. Hold steady and try again.')
+      }
+    } catch {
+      setCameraError('Could not read QR code from the captured frame. Please retry.')
+    }
+
     setCapturedImage(canvas.toDataURL('image/png'))
     stopCamera()
   }
@@ -665,6 +728,14 @@ function ShelfExperiencePage({ store, layout, onBack }) {
           Shelf code{' '}
           <span className="shelf-page__code-badge">{shelfCodeDisplay}</span>
         </p>
+
+        <div className="shelf-page__share-url">
+          <span className="url-label">Shareable Link:</span>
+          <code>{window.location.href}</code>
+          <button onClick={() => navigator.clipboard.writeText(window.location.href)}>
+            Copy
+          </button>
+        </div>
       </header>
 
       {/* ── Scan modal ── */}
