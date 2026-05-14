@@ -1,11 +1,13 @@
 const DEFAULT_PLANOGRAM_API_BASE = 'https://planogram.fcust.com'
 const DEFAULT_STORE_SCAN_START_ID = 1
 const DEFAULT_STORE_SCAN_MAX_ID = 1500
-const DEFAULT_STORE_SCAN_BATCH_SIZE = 100
-const DEFAULT_STORE_SCAN_MISS_STREAK_LIMIT = 40
+const DEFAULT_STORE_SCAN_BATCH_SIZE = 50
+const DEFAULT_STORE_SCAN_MISS_STREAK_LIMIT = 15
 const DEFAULT_STORE_REQUEST_TIMEOUT_MS = 10000
 const DEFAULT_STORES_CACHE_TTL_MS = 60000
 const STORES_CACHE_KEY = 'planogramStoresCache:v1'
+
+let storesRequestInFlight = null
 
 const trimValue = (value) => {
     if (typeof value !== 'string') {
@@ -614,6 +616,7 @@ const discoverAllStoresByIdScan = async () => {
             discoveredStores.push(result.store)
         }
 
+        // Do not stop before the first discovery; some datasets start at higher IDs.
         if (missStreak >= missStreakLimit && discoveredStores.length > 0) {
             break
         }
@@ -628,7 +631,7 @@ const discoverAllStoresByIdScan = async () => {
     return discoveredStores
 }
 
-export const fetchPlanogramStores = async ({ identity } = {}) => {
+const fetchPlanogramStoresInternal = async ({ identity } = {}) => {
     // 1. Return from cache if still fresh
     const cachedStores = getFreshCachedStores()
     if (cachedStores && cachedStores.length > 0) {
@@ -672,15 +675,12 @@ export const fetchPlanogramStores = async ({ identity } = {}) => {
             }
         }
     } catch (error) {
-        // For auth/client errors, ID scan is very noisy and usually invalid.
+        // On this backend, /api/stores may return 400 without identity.
+        // Fall through so ID-scan fallback can still discover stores.
         const status = getErrorStatusCode(error)
-        if (status === 400 || status === 401 || status === 403 || status === 404) {
-            return {
-                stores: [],
-                hasIdentity: Boolean(resolvedIdentity),
-            }
+        if (status && status >= 500) {
+            // Keep same fallback path for server errors.
         }
-        // Fall through to ID scan as absolute last resort for transient/network failures.
     }
 
     // 4. Last resort: ID scan — only runs when both REST calls above fail entirely
@@ -697,6 +697,19 @@ export const fetchPlanogramStores = async ({ identity } = {}) => {
         stores: [],
         hasIdentity: Boolean(resolvedIdentity),
     }
+}
+
+export const fetchPlanogramStores = async ({ identity } = {}) => {
+    if (storesRequestInFlight) {
+        return storesRequestInFlight
+    }
+
+    storesRequestInFlight = fetchPlanogramStoresInternal({ identity })
+        .finally(() => {
+            storesRequestInFlight = null
+        })
+
+    return storesRequestInFlight
 }
 
 export const fetchPlanogramStoreById = async (storeId) => {
