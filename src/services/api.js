@@ -45,12 +45,14 @@ export const sendAgentQuery = async (query) => {
     return response.json();
 };
 
-// Accepts: messages = [{role: 'user'|'assistant'|'system', content: string}, ...]
-export const sendChatQuery = async (messages) => {
+// Accepts:
+// query: latest user prompt string
+// messages: [{role: 'user'|'assistant'|'system', content: string}, ...]
+export const sendChatQuery = async (query, messages) => {
     const response = await fetch(`${FLASK_BASE_URL}/api/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages })
+        body: JSON.stringify({ query, messages })
     });
     return response.json();
 };

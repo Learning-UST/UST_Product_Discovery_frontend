@@ -582,7 +582,6 @@ function ShelfExperiencePage({ store, layout, onBack }) {
     if (!searchTerm.trim()) { setDropdownResults([]); setShowDropdown(false); return }
     const filtered = fuzzyFilter(allStoreProducts, searchTerm)
     setDropdownResults(filtered)
-    setShowDropdown(filtered.length > 0)
   }, [searchTerm, allStoreProducts])
 
   useEffect(() => {
@@ -606,6 +605,12 @@ function ShelfExperiencePage({ store, layout, onBack }) {
     })
   }
 
+  const isQuestionInput = (value) => {
+    const text = value.trim()
+    if (!text) return false
+    return /\?|\b(what|which|where|when|why|how|can|should|tell|show|find|recommend)\b/i.test(text)
+  }
+
   const buildMessagesFromHistory = (history, userQuery) => {
     const mapped = history
       .filter((m) => m.role === 'user' || m.role === 'ai')
@@ -627,11 +632,9 @@ function ShelfExperiencePage({ store, layout, onBack }) {
     setSelectedProducts((prev) => {
       const selectedId = storeProduct.id || storeProduct.name || storeProduct.product_name
       const alreadySelected = prev.find((product) => (product.id || product.name || product.product_name) === selectedId)
-      const updated = alreadySelected
+      return alreadySelected
         ? prev.filter((product) => (product.id || product.name || product.product_name) !== selectedId)
         : [...prev, storeProduct]
-      setSearchTerm(updated.map((product) => product.name || product.product_name || '').join(', '))
-      return updated
     })
 
     setShowDropdown(false)
@@ -668,7 +671,7 @@ function ShelfExperiencePage({ store, layout, onBack }) {
         const shelfName = layout?.name || 'this shelf'
         const userQuery = `The product "${selectedLabel}" is not on "${shelfName}". Which shelf or section in ${storeName} would I find it? Please be specific.`
         const messages = buildMessagesFromHistory(chatHistory, userQuery)
-        const res = await sendChatQuery(messages)
+        const res = await sendChatQuery(userQuery, messages)
         setChatHistory((prev) => [
           ...prev.slice(0, -1), // Remove 'Searching...'
           { role: 'ai', text: `⚠️ "${selectedLabel}" is not on this shelf.\n\n${res.answer || 'Unable to determine which shelf this product is on.'}` }
@@ -684,22 +687,16 @@ function ShelfExperiencePage({ store, layout, onBack }) {
 
   const removeSelected = (product) => {
     const selectedId = product.id || product.name || product.product_name
-    setSelectedProducts((prev) => {
-      const updated = prev.filter((item) => (item.id || item.name || item.product_name) !== selectedId)
-      setSearchTerm(updated.map((item) => item.name || item.product_name || '').join(', '))
-      return updated
-    })
+    setSelectedProducts((prev) => prev.filter((item) => (item.id || item.name || item.product_name) !== selectedId))
   }
 
   const toggleSelectedProduct = (product) => {
     const selectedId = product.id || product.name || product.product_name
     setSelectedProducts((prev) => {
       const alreadySelected = prev.some((item) => (item.id || item.name || item.product_name) === selectedId)
-      const updated = alreadySelected
+      return alreadySelected
         ? prev.filter((item) => (item.id || item.name || item.product_name) !== selectedId)
         : [...prev, product]
-      setSearchTerm(updated.map((item) => item.name || item.product_name || '').join(', '))
-      return updated
     })
   }
 
@@ -711,6 +708,7 @@ function ShelfExperiencePage({ store, layout, onBack }) {
   const handleAskAI = async () => {
     const query = searchTerm.trim()
     if (!query) return
+    setShowDropdown(false)
 
     const selectedLabels = getSelectedProductLabels()
     const scopedQuery =
@@ -726,7 +724,7 @@ function ShelfExperiencePage({ store, layout, onBack }) {
 
     try {
       const messages = buildMessagesFromHistory(chatHistory, scopedQuery)
-      const res = await sendChatQuery(messages)
+      const res = await sendChatQuery(scopedQuery, messages)
       setChatHistory((prev) => [
         ...prev.slice(0, -1), // Remove 'Thinking...'
         { role: 'ai', text: res.answer || JSON.stringify(res) }
@@ -1055,9 +1053,19 @@ function ShelfExperiencePage({ store, layout, onBack }) {
               placeholder="Search products on this shelf..."
               value={searchTerm}
               onChange={(e) => {
-                setSearchTerm(e.target.value)
+                const value = e.target.value
+                setSearchTerm(value)
+                if (!value.trim()) {
+                  setShowDropdown(false)
+                  return
+                }
+                setShowDropdown(!isQuestionInput(value))
               }}
-              onFocus={() => dropdownResults.length > 0 && setShowDropdown(true)}
+              onFocus={() => {
+                if (searchTerm.trim() && !isQuestionInput(searchTerm) && dropdownResults.length > 0) {
+                  setShowDropdown(true)
+                }
+              }}
               onBlur={() => setTimeout(() => setShowDropdown(false), 150)}
               onKeyDown={(e) => { if (e.key === 'Enter' && !showDropdown) handleAskAI() }}
               autoComplete="off"
@@ -1077,7 +1085,7 @@ function ShelfExperiencePage({ store, layout, onBack }) {
               </svg>
               {isListening && <span className="shelf-page__mic-pulse" aria-hidden="true" />}
             </button>
-            {showDropdown && (
+            {showDropdown && dropdownResults.length > 0 && (
               <ul className="shelf-page__search-dropdown" role="listbox">
                 <li className="shelf-page__search-dropdown-header">
                   <span className="shelf-page__search-dropdown-title">Results</span>
