@@ -377,6 +377,19 @@ function StoreExperiencePage({ store, onChangeStore, onLayoutSelect }) {
       .join('\n')
   }
 
+  const getSelectedProductLabels = () =>
+    selectedProducts
+      .map((product) => product.Name || product.name || product.product_name || product.ProductName || '')
+      .filter(Boolean)
+
+  const queryMentionsSelectedProduct = (query, productLabels) => {
+    const normalizedQuery = query.toLowerCase()
+    return productLabels.some((label) => {
+      const normalizedLabel = label.toLowerCase().trim()
+      return normalizedLabel && normalizedQuery.includes(normalizedLabel)
+    })
+  }
+
   const handleSelectProduct = (product) => {
     const id = product.id || product.Name || product.name || product.product_name
     const label = product.Name || product.name || product.product_name || ''
@@ -428,9 +441,16 @@ function StoreExperiencePage({ store, onChangeStore, onLayoutSelect }) {
   const handleChatQuery = async () => {
     const query = searchTerm.trim()
     if (!query) return
+
+    const selectedLabels = getSelectedProductLabels()
+    const scopedQuery =
+      selectedLabels.length > 0 && !queryMentionsSelectedProduct(query, selectedLabels)
+        ? `Answer only for these selected products: ${selectedLabels.join(', ')}. User question: ${query}`
+        : query
+
     setAiResponse('Thinking...')
     try {
-      const res = await sendChatQuery(query)
+      const res = await sendChatQuery(scopedQuery)
       setAiResponse(res.answer || JSON.stringify(res))
     } catch (err) {
       setAiResponse('Error: ' + err.message)
@@ -582,7 +602,10 @@ function StoreExperiencePage({ store, onChangeStore, onLayoutSelect }) {
                 type="search"
                 className="store-page__search-input"
                 value={searchTerm}
-                onChange={(event) => setSearchTerm(event.target.value)}
+                onChange={(event) => {
+                  setSearchTerm(event.target.value)
+                  setAiResponse('')
+                }}
                 onFocus={() => searchResults.length > 0 && setShowDropdown(true)}
                 onBlur={() => setTimeout(() => setShowDropdown(false), 150)}
                 onKeyDown={(e) => { if (e.key === 'Enter' && !showDropdown) handleChatQuery() }}
