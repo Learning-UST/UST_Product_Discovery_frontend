@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import * as SpeechSDK from 'microsoft-cognitiveservices-speech-sdk'
 import { fetchLayoutById } from '../../services/planogramStoresApi'
 import { fetchAllProductsFull, fetchAllProducts, fetchDirectProductDetails, getSpeechToken, sendChatQuery } from '../../services/api'
@@ -173,6 +173,13 @@ const parseShelfMeta = (rawLayoutData) => {
     shelfCount: layoutPlan.length,
   }
 }
+
+const normalizeProductName = (value) =>
+  String(value || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
 
 // function ProductCard({ product, expanded, onToggle }) {
 //   const brandLabel = getBrandLabel(product)
@@ -470,6 +477,58 @@ function ShelfExperiencePage({ store, layout, onBack, onQrShelfDetected, isQrLoa
   const qrScanLoopRef = useRef(null)
   const chatHistoryRef = useRef(null)
 
+  const viewerHighlightedProducts = useMemo(() => {
+    const shelfNameByNormalized = new Map()
+    products.forEach((product) => {
+      const normalized = normalizeProductName(product?.name)
+      if (normalized && !shelfNameByNormalized.has(normalized)) {
+        shelfNameByNormalized.set(normalized, product?.layoutName || product?.name || '')
+      }
+    })
+
+    const matchedSelected = selectedProducts
+      .map((product) => {
+        const candidateNames = [
+          product?.layoutName,
+          product?.name,
+          product?.product_name,
+          product?.ProductName,
+        ]
+
+        for (const candidate of candidateNames) {
+          const normalized = normalizeProductName(candidate)
+          if (!normalized) continue
+          if (shelfNameByNormalized.has(normalized)) {
+            return shelfNameByNormalized.get(normalized)
+          }
+        }
+
+        return ''
+      })
+      .filter(Boolean)
+
+    const merged = [...matchedSelected]
+    if (highlightedProduct) {
+      merged.push(highlightedProduct)
+    }
+
+    const seen = new Set()
+    return merged.filter((name) => {
+      const normalized = normalizeProductName(name)
+      if (!normalized || seen.has(normalized)) return false
+      seen.add(normalized)
+      return true
+    })
+  }, [products, selectedProducts, highlightedProduct])
+
+  const viewerHighlightQuery = useMemo(() => {
+    if (viewerHighlightedProducts.length === 0) return ''
+    const repeatedHighlights = viewerHighlightedProducts
+      .map((name) => `&highlightProducts=${encodeURIComponent(name)}`)
+      .join('')
+    return `${repeatedHighlights}&maskOthers=true&maskColor=%23111111&maskOpacity=0.72`
+  }, [viewerHighlightedProducts])
+
   const handleShareLink = async () => {
     const shareUrl = window.location.href
     try {
@@ -741,8 +800,12 @@ function ShelfExperiencePage({ store, layout, onBack, onQrShelfDetected, isQrLoa
 
   const filteredProducts = searchTerm ? fuzzyFilter(products, searchTerm) : products
 
-  const toggleProduct = (key) => {
-    setExpandedId((prev) => (prev === key ? null : key))
+  const toggleProduct = (key, product) => {
+    setExpandedId((prev) => {
+      const nextExpanded = prev === key ? null : key
+      setHighlightedProduct(nextExpanded ? (product?.layoutName || product?.name || '') : '')
+      return nextExpanded
+    })
   }
 
   const startCamera = async () => {
@@ -1059,9 +1122,7 @@ function ShelfExperiencePage({ store, layout, onBack, onQrShelfDetected, isQrLoa
         {layout.id ? (
           <iframe
             className="shelf-page__viewer-iframe"
-            src={`${PLANOGRAM_VIEWER_BASE_URL}/viewer?shelfId=${encodeURIComponent(layout.id)}${
-              highlightedProduct ? `&highlightProduct=${encodeURIComponent(highlightedProduct)}` : ''
-            }`}
+            src={`${PLANOGRAM_VIEWER_BASE_URL}/viewer?shelfId=${encodeURIComponent(layout.id)}${viewerHighlightQuery}`}
             title={`3D planogram view – ${layout.name || layout.id}`}
             allowFullScreen
             loading="lazy"
@@ -1246,7 +1307,7 @@ function ShelfExperiencePage({ store, layout, onBack, onQrShelfDetected, isQrLoa
                 product={product}
                 shelfFolder={shelfMeta.shelfCode}
                 expanded={expandedId === key}
-                onToggle={() => toggleProduct(key)}
+                onToggle={() => toggleProduct(key, product)}
                 selected={isProductSelected(product)}
                 onSelectToggle={() => toggleSelectedProduct(product)}
               />
