@@ -2,8 +2,8 @@ export const howItWorksSteps = [
   {
     id: 'step-01',
     number: '01',
-    title: 'Pick a store',
-    description: 'Choose your location to load its catalog and shelf map.',
+    title: 'Scan the shelf QR',
+    description: 'Point your camera at a shelf QR code to open that exact shelf instantly.',
   },
   {
     id: 'step-02',

@@ -198,6 +198,24 @@
   object-fit: cover;
 }
 
+.shelf-page__scan-status {
+  margin: 0;
+  padding: 0.2rem 1.1rem 0.7rem;
+  color: #dfe9e2;
+  font-family: 'Manrope', sans-serif;
+  font-size: 0.88rem;
+}
+
+.shelf-page__scan-canvas {
+  display: none;
+}
+
+.shelf-page__scan-actions {
+  display: flex;
+  gap: 0.75rem;
+  padding: 0.8rem;
+}
+
 /* Scan drawer (keep for reference) */
 .shelf-page__scan-drawer {
   background: #fff;
@@ -241,6 +259,10 @@
   border-radius: 8px;
   font-weight: 600;
   cursor: pointer;
+}
+.shelf-page__capture-btn:disabled {
+  opacity: 0.8;
+  cursor: progress;
 }
 .shelf-page__secondary-btn {
   flex: 1;

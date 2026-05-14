@@ -441,7 +441,7 @@ function ProductCard({ product, shelfFolder, expanded, onToggle, selected, onSel
   )
 }
 
-function ShelfExperiencePage({ store, layout, onBack }) {
+function ShelfExperiencePage({ store, layout, onBack, onQrShelfDetected, isQrLoading = false }) {
   const [fullLayout, setFullLayout] = useState(null)
   const [products, setProducts] = useState([])
   const [shelfMeta, setShelfMeta] = useState({ aisleNumber: '1', shelfCode: '' })
@@ -460,11 +460,14 @@ function ShelfExperiencePage({ store, layout, onBack }) {
   const [speechError, setSpeechError] = useState('')
   const [isListening, setIsListening] = useState(false)
   const [isCameraActive, setIsCameraActive] = useState(false)
-  const [capturedImage, setCapturedImage] = useState('')
+  const [qrMessage, setQrMessage] = useState('')
+  const [qrScanned, setQrScanned] = useState(false)
   const [highlightedProduct, setHighlightedProduct] = useState('')
   const videoRef = useRef(null)
   const streamRef = useRef(null)
   const speechRecognizerRef = useRef(null)
+  const canvasRef = useRef(null)
+  const qrScanLoopRef = useRef(null)
   const chatHistoryRef = useRef(null)
 
   const handleShareLink = async () => {
@@ -750,6 +753,8 @@ function ShelfExperiencePage({ store, layout, onBack }) {
     }
     try {
       setCameraError('')
+      setQrMessage('Point the camera at a shelf QR code.')
+      setQrScanned(false)
       if (streamRef.current) {
         streamRef.current.getTracks().forEach((track) => track.stop())
       }
@@ -763,7 +768,6 @@ function ShelfExperiencePage({ store, layout, onBack }) {
         stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false })
       }
       streamRef.current = stream
-      setCapturedImage('')
       setIsCameraActive(true)
     } catch {
       setCameraError('Camera access failed.')
@@ -780,46 +784,6 @@ function ShelfExperiencePage({ store, layout, onBack }) {
     setIsCameraActive(false)
   }
 
-  const captureFrame = () => {
-    if (!videoRef.current) return
-    const video = videoRef.current
-    const canvas = document.createElement('canvas')
-    canvas.width = video.videoWidth || 1280
-    canvas.height = video.videoHeight || 720
-    const context = canvas.getContext('2d')
-    if (!context) { setCameraError('Capture failed.'); return }
-    context.drawImage(video, 0, 0, canvas.width, canvas.height)
-
-    try {
-      const imageData = context.getImageData(0, 0, canvas.width, canvas.height)
-      const qrResult = jsQR(imageData.data, imageData.width, imageData.height)
-
-      if (qrResult?.data) {
-        const shelfId = extractShelfIdFromQrText(qrResult.data)
-        if (shelfId) {
-          stopCamera()
-          setScanOpen(false)
-          redirectToShelfById(shelfId)
-          return
-        }
-
-        setCameraError('QR scanned, but no valid shelfId was found in the QR content.')
-      } else {
-        setCameraError('No QR code detected. Hold steady and try again.')
-      }
-    } catch {
-      setCameraError('Could not read QR code from the captured frame. Please retry.')
-    }
-
-    setCapturedImage(canvas.toDataURL('image/png'))
-    stopCamera()
-  }
-
-  const handleRetake = async () => {
-    setCapturedImage('')
-    await startCamera()
-  }
-
   useEffect(() => {
     const attachStream = async () => {
       if (!isCameraActive || !videoRef.current || !streamRef.current) return
@@ -834,6 +798,81 @@ function ShelfExperiencePage({ store, layout, onBack }) {
       if (streamRef.current) streamRef.current.getTracks().forEach((track) => track.stop())
     }
   }, [])
+
+  useEffect(() => {
+    if (!isCameraActive || !videoRef.current || !canvasRef.current || qrScanned || isQrLoading) {
+      return undefined
+    }
+
+    const scanQr = async () => {
+      if (!videoRef.current || !canvasRef.current || qrScanned || isQrLoading) {
+        return
+      }
+
+      const video = videoRef.current
+      const canvas = canvasRef.current
+      const context = canvas.getContext('2d', { willReadFrequently: true })
+
+      if (!context) {
+        setCameraError('QR scanning is not supported on this device.')
+        return
+      }
+
+      if (video.readyState !== video.HAVE_ENOUGH_DATA) {
+        qrScanLoopRef.current = requestAnimationFrame(scanQr)
+        return
+      }
+
+      canvas.width = video.videoWidth
+      canvas.height = video.videoHeight
+      context.drawImage(video, 0, 0, canvas.width, canvas.height)
+
+      try {
+        const imageData = context.getImageData(0, 0, canvas.width, canvas.height)
+        const qrResult = jsQR(imageData.data, imageData.width, imageData.height)
+
+        if (qrResult?.data) {
+          const shelfId = extractShelfIdFromQrText(qrResult.data)
+
+          if (shelfId) {
+            setQrScanned(true)
+            setQrMessage(`Shelf ${shelfId} detected. Opening...`)
+            setCameraError('')
+            stopCamera()
+
+            try {
+              if (onQrShelfDetected) {
+                await onQrShelfDetected(shelfId)
+              } else {
+                redirectToShelfById(shelfId)
+              }
+              setScanOpen(false)
+            } catch {
+              setQrScanned(false)
+              setCameraError('QR scanned, but the shelf could not be opened.')
+              setQrMessage('')
+            }
+            return
+          }
+
+          setCameraError('QR scanned, but no valid shelfId was found in the QR content.')
+        }
+      } catch {
+        // Continue scanning until a valid QR code is found.
+      }
+
+      qrScanLoopRef.current = requestAnimationFrame(scanQr)
+    }
+
+    qrScanLoopRef.current = requestAnimationFrame(scanQr)
+
+    return () => {
+      if (qrScanLoopRef.current) {
+        cancelAnimationFrame(qrScanLoopRef.current)
+        qrScanLoopRef.current = null
+      }
+    }
+  }, [isCameraActive, qrScanned, isQrLoading, onQrShelfDetected])
 
   useEffect(() => {
     return () => {
@@ -920,7 +959,15 @@ function ShelfExperiencePage({ store, layout, onBack }) {
           type="button"
           className="shelf-page__scan-corner-btn"
           aria-label="Scan shelf"
-          onClick={() => { const opening = !scanOpen; setScanOpen(opening); setCapturedImage(''); setCameraError(''); if (opening) { startCamera(); } else { stopCamera(); } }}
+          onClick={() => {
+            const opening = !scanOpen
+            setScanOpen(opening)
+            setCameraError('')
+            setQrMessage('')
+            setQrScanned(false)
+            if (opening) startCamera()
+            else stopCamera()
+          }}
         >
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
             <rect x="3" y="3" width="7" height="7" rx="1" />
@@ -983,13 +1030,25 @@ function ShelfExperiencePage({ store, layout, onBack }) {
               </button>
             </div>
             {cameraError && <p className="shelf-page__error">{cameraError}</p>}
+            {qrMessage && <p className="shelf-page__scan-status">{qrMessage}</p>}
             {isCameraActive && (
-              <video ref={videoRef} autoPlay playsInline muted className="shelf-page__scan-modal-video" />
+              <>
+                <video ref={videoRef} autoPlay playsInline muted className="shelf-page__scan-modal-video" />
+                <canvas ref={canvasRef} className="shelf-page__scan-canvas" aria-hidden="true" />
+              </>
             )}
-            {capturedImage && (
-              <div className="shelf-page__capture-result">
-                <img src={capturedImage} alt="Captured shelf" className="shelf-page__captured-image" />
-                <button type="button" className="shelf-page__secondary-btn" onClick={handleRetake}>Retake</button>
+            {!isQrLoading && isCameraActive && !qrScanned && (
+              <div className="shelf-page__scan-actions">
+                <button type="button" className="shelf-page__secondary-btn" onClick={() => { stopCamera(); startCamera() }}>
+                  Retry camera
+                </button>
+              </div>
+            )}
+            {isQrLoading && (
+              <div className="shelf-page__scan-actions">
+                <button type="button" className="shelf-page__capture-btn" disabled>
+                  Opening shelf...
+                </button>
               </div>
             )}
           </div>

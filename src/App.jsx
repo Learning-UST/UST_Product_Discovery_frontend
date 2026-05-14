@@ -142,42 +142,43 @@ function App() {
   const featuresRef = useRef(null)
   const storesRef = useRef(null)
   const howItWorksRef = useRef(null)
-  
+
   const [activeStore, setActiveStore] = useState(null)
   const [activeLayout, setActiveLayout] = useState(null)
   const [isAutoLoading, setIsAutoLoading] = useState(false)
-  
+
   const { scrollToSection } = useSmoothScroll()
+
+  const loadShelfById = async (shelfId) => {
+    setIsAutoLoading(true)
+
+    try {
+      const layoutData = await fetchLayoutById(shelfId)
+      const mappedLayout = {
+        id: shelfId,
+        name: layoutData.layout_data?.shelf_name || `Shelf ${shelfId}`,
+        previewImage: layoutData.preview_image,
+      }
+
+      const storeId = layoutData.store_id || '1'
+      const storeData = await fetchPlanogramStoreById(storeId)
+
+      setActiveStore(storeData)
+      setActiveLayout(mappedLayout)
+    } catch (err) {
+      console.error('QR Load Error:', err)
+      throw err
+    } finally {
+      setIsAutoLoading(false)
+    }
+  }
 
   useEffect(() => {
     const shelfId = resolveShelfIdFromLocation(window.location)
 
     // Only auto-load if we have an ID and we aren't already looking at it
     if (shelfId && (!activeLayout || String(activeLayout.id) !== shelfId)) {
-      const autoLoadShelf = async () => {
-        setIsAutoLoading(true)
-        try {
-          const layoutData = await fetchLayoutById(shelfId)
-          // Map backend layout_data to what the UI expects
-          const mappedLayout = {
-            id: shelfId,
-            name: layoutData.layout_data?.shelf_name || `Shelf ${shelfId}`,
-            previewImage: layoutData.preview_image
-          }
-
-          // Fetch store context
-          const storeId = layoutData.store_id || '1'
-          const storeData = await fetchPlanogramStoreById(storeId)
-          
-          setActiveStore(storeData)
-          setActiveLayout(mappedLayout)
-        } catch (err) {
-          console.error('QR Load Error:', err)
-        } finally {
-          setIsAutoLoading(false)
-        }
-      }
-      autoLoadShelf()
+      loadShelfById(shelfId).catch(() => {})
     }
   }, []) // Run ONLY once on mount
 
@@ -232,6 +233,8 @@ function App() {
         store={activeStore}
         layout={activeLayout}
         onBack={handleBackToStore}
+        onQrShelfDetected={loadShelfById}
+        isQrLoading={isAutoLoading}
       />
     )
   }
@@ -252,6 +255,8 @@ function App() {
         onFeaturesClick={handleFeaturesClick}
         onStoresClick={handleStoresClick}
         onHowItWorksClick={handleHowItWorksClick}
+        onQrShelfDetected={loadShelfById}
+        isQrLoading={isAutoLoading}
       />
       <main>
         <HeroSection onStoresClick={handleStoresClick} onFeaturesClick={handleFeaturesClick} />

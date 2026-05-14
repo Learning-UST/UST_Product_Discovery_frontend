@@ -37,7 +37,6 @@
 }
 
 .brand__text {
-  color: #fff;
   letter-spacing: 0.01em;
   font-family: 'Fraunces', serif;
   font-size: clamp(1.3rem, 1.25rem + 0.5vw, 2rem);
@@ -70,45 +69,59 @@
 }
 
 .top-nav__actions {
+  display: inline-flex;
   align-items: center;
   gap: 0.7rem;
-  display: inline-flex;
+  flex-shrink: 0;
 }
 
 .top-nav__scan-btn {
-  color: #f4f7f5;
-  cursor: pointer;
-  background: rgba(255, 255, 255, 0.12);
-  border: 1.5px solid rgba(255, 255, 255, 0.45);
-  border-radius: 8px;
-  justify-content: center;
-  align-items: center;
-  width: 2.6rem;
-  height: 2.6rem;
-  transition: background 0.18s;
-  display: flex;
-  padding: 0;
   appearance: none;
   -webkit-appearance: none;
+  width: 3.95rem;
+  min-width: 3.95rem;
+  height: 3.95rem;
+  min-height: 3.95rem;
+  padding: 0;
+  flex: 0 0 3.95rem;
+  border-radius: 0.95rem;
+  border: 2px solid #c7d8cb;
+  background: #ffffff0f;
+  color: #d9e7db;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  vertical-align: middle;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: inset 0 0 0 1px #ffffff12;
+  transition: background 0.18s, border-color 0.18s;
+  overflow: hidden;
 }
 
 .top-nav__scan-btn:hover {
-  background: rgba(255, 255, 255, 0.22);
+  background: #ffffff1a;
+  border-color: #d8e7db;
 }
 
 .top-nav__scan-btn svg {
-  width: 1.35rem;
-  height: 1.35rem;
+  width: 1.48rem;
+  height: 1.48rem;
+  min-width: 1.48rem;
+  min-height: 1.48rem;
+  stroke-width: 2;
+  flex: 0 0 auto;
+  display: block;
 }
 
 .top-nav__scan-modal-overlay {
-  background: rgba(0, 0, 0, 0.72);
-  z-index: 1000;
-  justify-content: center;
-  align-items: center;
-  display: flex;
   position: fixed;
   inset: 0;
+  background: #000000b8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
 }
 
 .top-nav__scan-modal {
@@ -130,7 +143,6 @@
 }
 
 .top-nav__scan-modal-title {
-  color: #fff;
   font-size: 1rem;
   font-weight: 600;
   letter-spacing: 0.02em;
@@ -145,17 +157,26 @@
   line-height: 1;
   padding: 0.2rem 0.4rem;
   border-radius: 4px;
-  transition: background 0.15s;
 }
 
 .top-nav__scan-modal-close:hover {
-  background: rgba(255, 255, 255, 0.15);
+  background: #ffffff1f;
 }
 
 .top-nav__scan-error {
-  margin: 0.75rem 1.2rem;
-  color: #f3aaaa;
-  font-size: 0.9rem;
+  margin: 0;
+  padding: 0.6rem 1.1rem;
+  color: #ffd4c8;
+  font-family: 'Manrope', sans-serif;
+  font-size: 0.88rem;
+}
+
+.top-nav__scan-status {
+  margin: 0;
+  padding: 0.2rem 1.1rem 0.6rem;
+  color: #dfe9e2;
+  font-family: 'Manrope', sans-serif;
+  font-size: 0.88rem;
 }
 
 .top-nav__scan-modal-video {
@@ -166,30 +187,54 @@
   object-fit: cover;
 }
 
-.top-nav__capture-result {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  padding: 0.8rem 1rem 1rem;
+.top-nav__scan-canvas {
+  display: none;
 }
 
-.top-nav__captured-image {
+.top-nav__scan-capture-result {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  padding: 0.7rem;
+}
+
+.top-nav__scan-captured-image {
   width: 100%;
   border-radius: 10px;
   object-fit: cover;
-  display: block;
 }
 
-.top-nav__secondary-btn {
-  width: 100%;
-  padding: 0.7rem;
-  background: transparent;
-  color: #c5dacf;
-  border: 1.5px solid #385645;
-  cursor: pointer;
+.top-nav__scan-modal-actions {
+  display: flex;
+  gap: 0.7rem;
+  padding: 0.8rem;
+}
+
+.top-nav__scan-primary-btn,
+.top-nav__scan-secondary-btn {
+  flex: 1;
   border-radius: 8px;
-  font-weight: 600;
-  font-size: 0.95rem;
+  padding: 0.68rem;
+  font-family: 'Manrope', sans-serif;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.top-nav__scan-primary-btn {
+  border: none;
+  background: #0a3f2b;
+  color: #fff;
+}
+
+.top-nav__scan-primary-btn:disabled {
+  opacity: 0.8;
+  cursor: progress;
+}
+
+.top-nav__scan-secondary-btn {
+  border: 1.5px solid #d4ddd8;
+  background: transparent;
+  color: #f4f7f5;
 }
 
 @media (width <= 1024px) {
@@ -209,17 +254,21 @@
     width: calc(100% - 1.2rem);
   }
 
-  .top-nav__cta {
-    padding: 0.7rem 0.95rem;
-    font-size: 0.9rem;
-  }
-
   .top-nav__actions {
     gap: 0.45rem;
   }
 
   .top-nav__scan-btn {
-    width: 38px;
-    height: 38px;
+    width: 2.85rem;
+    min-width: 2.85rem;
+    height: 2.85rem;
+    min-height: 2.85rem;
+    flex-basis: 2.85rem;
+    border-radius: 0.8rem;
+  }
+
+  .top-nav__cta {
+    padding: 0.7rem 0.95rem;
+    font-size: 0.9rem;
   }
 }

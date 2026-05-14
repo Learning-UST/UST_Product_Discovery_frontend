@@ -1,43 +1,68 @@
 import { useEffect, useRef, useState } from 'react'
+import jsQR from 'jsqr'
 import Button from '../ui/Button'
 import './styles/Header.css'
 
-function Header({ onFeaturesClick, onStoresClick, onHowItWorksClick }) {
+const trimValue = (value) => (typeof value === 'string' ? value.trim() : '')
+
+const extractShelfIdFromQrText = (rawValue) => {
+  const value = trimValue(rawValue)
+  if (!value) {
+    return ''
+  }
+
+  if (/^\d+$/.test(value)) {
+    return value
+  }
+
+  try {
+    const parsed = new URL(value)
+    return (
+      trimValue(parsed.searchParams.get('shelfId')) ||
+      trimValue(parsed.searchParams.get('layoutId')) ||
+      trimValue(parsed.searchParams.get('savedLayoutId')) ||
+      trimValue(parsed.searchParams.get('shelf')) ||
+      ''
+    )
+  } catch {
+    const match = value.match(/(?:shelfId|layoutId|savedLayoutId|shelf)=([^&]+)/i)
+    return match?.[1] ? decodeURIComponent(match[1]).trim() : ''
+  }
+}
+
+function Header({ onFeaturesClick, onStoresClick, onHowItWorksClick, onQrShelfDetected, isQrLoading = false }) {
   const [scanOpen, setScanOpen] = useState(false)
   const [cameraError, setCameraError] = useState('')
   const [isCameraActive, setIsCameraActive] = useState(false)
-  const [capturedImage, setCapturedImage] = useState('')
+  const [qrMessage, setQrMessage] = useState('')
+  const [qrScanned, setQrScanned] = useState(false)
   const videoRef = useRef(null)
   const streamRef = useRef(null)
+  const canvasRef = useRef(null)
+  const qrScanLoopRef = useRef(null)
 
   const startCamera = async () => {
     if (!navigator.mediaDevices?.getUserMedia) {
       setCameraError('Camera is not available on this browser.')
       return
     }
-
     try {
       setCameraError('')
+      setQrMessage('Point the camera at a shelf QR code.')
+      setQrScanned(false)
       if (streamRef.current) {
         streamRef.current.getTracks().forEach((track) => track.stop())
       }
-
       let stream
       try {
         stream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            facingMode: { ideal: 'environment' },
-            width: { ideal: 1280 },
-            height: { ideal: 720 },
-          },
+          video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } },
           audio: false,
         })
       } catch {
         stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false })
       }
-
       streamRef.current = stream
-      setCapturedImage('')
       setIsCameraActive(true)
     } catch {
       setCameraError('Camera access failed.')
@@ -50,66 +75,102 @@ function Header({ onFeaturesClick, onStoresClick, onHowItWorksClick }) {
       streamRef.current.getTracks().forEach((track) => track.stop())
       streamRef.current = null
     }
-
-    if (videoRef.current) {
-      videoRef.current.srcObject = null
-    }
-
+    if (videoRef.current) videoRef.current.srcObject = null
     setIsCameraActive(false)
-  }
-
-  const captureFrame = () => {
-    if (!videoRef.current) return
-
-    const video = videoRef.current
-    const canvas = document.createElement('canvas')
-    canvas.width = video.videoWidth || 1280
-    canvas.height = video.videoHeight || 720
-
-    const context = canvas.getContext('2d')
-    if (!context) {
-      setCameraError('Capture failed.')
-      return
-    }
-
-    context.drawImage(video, 0, 0, canvas.width, canvas.height)
-    setCapturedImage(canvas.toDataURL('image/png'))
-    stopCamera()
-  }
-
-  const handleRetake = async () => {
-    setCapturedImage('')
-    await startCamera()
   }
 
   useEffect(() => {
     const attachStream = async () => {
       if (!isCameraActive || !videoRef.current || !streamRef.current) return
       videoRef.current.srcObject = streamRef.current
-      try {
-        await videoRef.current.play()
-      } catch {
-        setCameraError('Camera started but video playback failed.')
-      }
+      try { await videoRef.current.play() } catch { setCameraError('Camera started but video playback failed.') }
     }
-
     attachStream()
   }, [isCameraActive])
 
   useEffect(() => {
     return () => {
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach((track) => track.stop())
-      }
+      if (streamRef.current) streamRef.current.getTracks().forEach((track) => track.stop())
     }
   }, [])
+
+  useEffect(() => {
+    if (!isCameraActive || !videoRef.current || !canvasRef.current || qrScanned || isQrLoading) {
+      return undefined
+    }
+
+    const scanQr = async () => {
+      if (!videoRef.current || !canvasRef.current || qrScanned || isQrLoading) {
+        return
+      }
+
+      const video = videoRef.current
+      const canvas = canvasRef.current
+      const context = canvas.getContext('2d', { willReadFrequently: true })
+
+      if (!context) {
+        setCameraError('QR scanning is not supported on this device.')
+        return
+      }
+
+      if (video.readyState !== video.HAVE_ENOUGH_DATA) {
+        qrScanLoopRef.current = requestAnimationFrame(scanQr)
+        return
+      }
+
+      canvas.width = video.videoWidth
+      canvas.height = video.videoHeight
+      context.drawImage(video, 0, 0, canvas.width, canvas.height)
+
+      try {
+        const imageData = context.getImageData(0, 0, canvas.width, canvas.height)
+        const qrResult = jsQR(imageData.data, imageData.width, imageData.height)
+
+        if (qrResult?.data) {
+          const shelfId = extractShelfIdFromQrText(qrResult.data)
+
+          if (shelfId) {
+            setQrScanned(true)
+            setQrMessage(`Shelf ${shelfId} detected. Opening...`)
+            setCameraError('')
+            stopCamera()
+
+            try {
+              await onQrShelfDetected?.(shelfId)
+              setScanOpen(false)
+            } catch {
+              setQrScanned(false)
+              setCameraError('QR scanned, but the shelf could not be opened.')
+              setQrMessage('')
+            }
+            return
+          }
+
+          setCameraError('QR scanned, but no valid shelfId was found in the QR content.')
+        }
+      } catch {
+        // Continue scanning until a valid QR code is found.
+      }
+
+      qrScanLoopRef.current = requestAnimationFrame(scanQr)
+    }
+
+    qrScanLoopRef.current = requestAnimationFrame(scanQr)
+
+    return () => {
+      if (qrScanLoopRef.current) {
+        cancelAnimationFrame(qrScanLoopRef.current)
+        qrScanLoopRef.current = null
+      }
+    }
+  }, [isCameraActive, qrScanned, isQrLoading, onQrShelfDetected])
 
   return (
     <>
       <header className="top-nav">
         <a className="brand" href="#home" aria-label="SmartShop home">
           <span className="brand__mark">S</span>
-          <span className="brand__text">Shopilot</span>
+          <span className="brand__text">SmartShop</span>
         </a>
 
         <nav className="top-nav__menu" aria-label="Primary navigation">
@@ -132,13 +193,11 @@ function Header({ onFeaturesClick, onStoresClick, onHowItWorksClick }) {
             onClick={() => {
               const opening = !scanOpen
               setScanOpen(opening)
-              setCapturedImage('')
               setCameraError('')
-              if (opening) {
-                startCamera()
-              } else {
-                stopCamera()
-              }
+              setQrMessage('')
+              setQrScanned(false)
+              if (opening) startCamera()
+              else stopCamera()
             }}
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
@@ -149,48 +208,42 @@ function Header({ onFeaturesClick, onStoresClick, onHowItWorksClick }) {
             </svg>
           </button>
 
-          <Button variant="secondary" className="top-nav__cta" onClick={onStoresClick}>
+          <Button variant="secondary" className="top-nav__cta">
             Shop now {'->'}
           </Button>
         </div>
       </header>
 
       {scanOpen && (
-        <div
-          className="top-nav__scan-modal-overlay"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) {
-              stopCamera()
-              setScanOpen(false)
-            }
-          }}
-        >
+        <div className="top-nav__scan-modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) { stopCamera(); setScanOpen(false) } }}>
           <div className="top-nav__scan-modal">
             <div className="top-nav__scan-modal-header">
               <span className="top-nav__scan-modal-title">Scan Shelf</span>
               <button
                 type="button"
                 className="top-nav__scan-modal-close"
-                onClick={() => {
-                  stopCamera()
-                  setScanOpen(false)
-                }}
+                onClick={() => { stopCamera(); setScanOpen(false) }}
                 aria-label="Close"
               >
-                ×
+                &#x2715;
               </button>
             </div>
-
             {cameraError && <p className="top-nav__scan-error">{cameraError}</p>}
-
+            {qrMessage && <p className="top-nav__scan-status">{qrMessage}</p>}
             {isCameraActive && (
-              <video ref={videoRef} autoPlay playsInline muted className="top-nav__scan-modal-video" />
+              <>
+                <video ref={videoRef} autoPlay playsInline muted className="top-nav__scan-modal-video" />
+                <canvas ref={canvasRef} className="top-nav__scan-canvas" aria-hidden="true" />
+              </>
             )}
-
-            {!isCameraActive && capturedImage && (
-              <div className="top-nav__capture-result">
-                <img src={capturedImage} alt="Captured shelf" className="top-nav__captured-image" />
-                <button type="button" className="top-nav__secondary-btn" onClick={handleRetake}>Retake</button>
+            {!isQrLoading && isCameraActive && !qrScanned && (
+              <div className="top-nav__scan-modal-actions">
+                <button type="button" className="top-nav__scan-secondary-btn" onClick={() => { stopCamera(); startCamera() }}>Retry camera</button>
+              </div>
+            )}
+            {isQrLoading && (
+              <div className="top-nav__scan-modal-actions">
+                <button type="button" className="top-nav__scan-primary-btn" disabled>Opening shelf...</button>
               </div>
             )}
           </div>

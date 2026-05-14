@@ -195,7 +195,7 @@ function StoreExperiencePage({ store, onChangeStore, onLayoutSelect }) {
 
   const startCamera = async () => {
     if (!navigator.mediaDevices?.getUserMedia) {
-      setCameraError('Camera is not available on this browser. Use upload or shelf selection.')
+      setCameraError('Camera is not available on this browser. Use shelf selection instead.')
       return
     }
 
@@ -231,7 +231,7 @@ function StoreExperiencePage({ store, onChangeStore, onLayoutSelect }) {
       setCapturedImage('')
       setIsCameraActive(true)
     } catch {
-      setCameraError('Camera access failed. You can upload a shelf image or choose a shelf manually.')
+      setCameraError('Camera access failed. You can choose a shelf manually.')
       setIsCameraActive(false)
     }
   }
@@ -537,11 +537,6 @@ function StoreExperiencePage({ store, onChangeStore, onLayoutSelect }) {
                 </button>
               </div>
             ) : null}
-
-            <label className="store-page__upload-label" htmlFor="shelf-upload">
-              Upload shelf image
-            </label>
-            <input id="shelf-upload" type="file" accept="image/*" className="store-page__upload" />
 
             <label className="store-page__shelf-label" htmlFor="shelf-select">
               Or choose layout/shelf manually
