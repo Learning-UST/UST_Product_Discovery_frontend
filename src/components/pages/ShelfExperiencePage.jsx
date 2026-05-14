@@ -268,7 +268,7 @@ const parseNutrition = (facts) => {
   return { nutrients, ingredients }
 }
 
-function ProductCard({ product, shelfFolder, expanded, onToggle }) {
+function ProductCard({ product, shelfFolder, expanded, onToggle, selected, onSelectToggle }) {
   const EXTENSIONS = ['jpg', 'png', 'jpeg', 'webp']
   const brandLabel = product.brand ? product.brand.split(' ')[0] : (product.name || '?').split(' ')[0]
   const color = getBrandColor(product.brand, product.name)
@@ -318,7 +318,18 @@ function ProductCard({ product, shelfFolder, expanded, onToggle }) {
 
   return (
     <li className="shelf-product">
-      <button type="button" className="shelf-product__main" onClick={onToggle}>
+      <div
+        className="shelf-product__main"
+        role="button"
+        tabIndex={0}
+        onClick={onToggle}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault()
+            onToggle()
+          }
+        }}
+      >
         {showImage ? (
           <img
             src={imgSrc}
@@ -351,9 +362,24 @@ function ProductCard({ product, shelfFolder, expanded, onToggle }) {
           ) : (
             <span className="shelf-product__badge shelf-product__badge--out">Out of stock</span>
           )}
+          <button
+            type="button"
+            className={`shelf-product__select-btn ${selected ? 'is-selected' : ''}`}
+            onClick={(e) => {
+              e.stopPropagation()
+              onSelectToggle()
+            }}
+            aria-pressed={selected}
+          >
+            <svg className="shelf-product__select-icon" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+              <circle cx="8.5" cy="8.5" r="5" stroke="currentColor" strokeWidth="1.6" />
+              <path d="M12.2 12.2l3.6 3.6" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+            </svg>
+            <span>{selected ? 'Added' : 'Explore'}</span>
+          </button>
           <span className={`shelf-product__chevron ${expanded ? 'is-open' : ''}`}>&#8964;</span>
         </div>
-      </button>
+      </div>
 
       {expanded && (
         <div className="shelf-product__detail">
@@ -389,7 +415,7 @@ function ProductCard({ product, shelfFolder, expanded, onToggle }) {
               {nutrients.length > 0 && (
                 <>
                   <p className="shelf-product__detail-section-heading">
-                    🔥 <strong>Nutrition</strong>&nbsp;<span className="shelf-product__detail-section-sub">(per serving)</span>
+                    <strong>Nutrition</strong>&nbsp;<span className="shelf-product__detail-section-sub">(per serving)</span>
                   </p>
                   <div className="shelf-product__nutr-grid">
                     {nutrients.map(({ label, value }) => (
@@ -422,7 +448,8 @@ function ShelfExperiencePage({ store, layout, onBack }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [searchTerm, setSearchTerm] = useState('')
-  const [aiResponse, setAiResponse] = useState('')
+  // WhatsApp-style chat history: array of {role: 'user'|'ai', text: string}
+  const [chatHistory, setChatHistory] = useState([])
   const [expandedId, setExpandedId] = useState(null)
   const [allStoreProducts, setAllStoreProducts] = useState([])
   const [dropdownResults, setDropdownResults] = useState([])
@@ -438,6 +465,7 @@ function ShelfExperiencePage({ store, layout, onBack }) {
   const videoRef = useRef(null)
   const streamRef = useRef(null)
   const speechRecognizerRef = useRef(null)
+  const chatHistoryRef = useRef(null)
 
   const handleShareLink = async () => {
     const shareUrl = window.location.href
@@ -450,9 +478,9 @@ function ShelfExperiencePage({ store, layout, onBack }) {
         return
       }
       await navigator.clipboard.writeText(shareUrl)
-      setAiResponse('Link copied to clipboard.')
+      setChatHistory((prev) => [...prev, { role: 'ai', text: 'Link copied to clipboard.' }])
     } catch {
-      setAiResponse('Unable to share link right now.')
+      setChatHistory((prev) => [...prev, { role: 'ai', text: 'Unable to share link right now.' }])
     }
   }
 
@@ -557,6 +585,14 @@ function ShelfExperiencePage({ store, layout, onBack }) {
     setShowDropdown(filtered.length > 0)
   }, [searchTerm, allStoreProducts])
 
+  useEffect(() => {
+    if (!chatHistoryRef.current) return
+    chatHistoryRef.current.scrollTo({
+      top: chatHistoryRef.current.scrollHeight,
+      behavior: 'smooth',
+    })
+  }, [chatHistory])
+
   const getSelectedProductLabels = () =>
     selectedProducts
       .map((product) => product.name || product.product_name || product.ProductName || '')
@@ -568,6 +604,17 @@ function ShelfExperiencePage({ store, layout, onBack }) {
       const normalizedLabel = label.toLowerCase().trim()
       return normalizedLabel && normalizedQuery.includes(normalizedLabel)
     })
+  }
+
+  const buildMessagesFromHistory = (history, userQuery) => {
+    const mapped = history
+      .filter((m) => m.role === 'user' || m.role === 'ai')
+      .map((m) => ({
+        role: m.role === 'user' ? 'user' : 'assistant',
+        content: m.text,
+      }))
+    mapped.push({ role: 'user', content: userQuery })
+    return mapped
   }
 
   // When user picks a product from the dropdown:
@@ -604,22 +651,33 @@ function ShelfExperiencePage({ store, layout, onBack }) {
         shelfMatch.category     && `Category: ${shelfMatch.category}`,
         shelfMatch.description  && `\n${shelfMatch.description}`,
       ].filter(Boolean).join('  ·  ')
-      setAiResponse(`✅ Found on this shelf\n\n${lines}`)
+      setChatHistory((prev) => [
+        ...prev,
+        { role: 'user', text: selectedLabel },
+        { role: 'ai', text: `✅ Found on this shelf\n\n${lines}` }
+      ])
     } else {
       setHighlightedProduct('')
-      setAiResponse('Searching...')
+      setChatHistory((prev) => [
+        ...prev,
+        { role: 'user', text: selectedLabel },
+        { role: 'ai', text: 'Searching...' }
+      ])
       try {
         const storeName = store?.name || 'this store'
         const shelfName = layout?.name || 'this shelf'
-        const res = await sendChatQuery(
-          `The product "${selectedLabel}" is not on "${shelfName}". Which shelf or section in ${storeName} would I find it? Please be specific.`
-        )
-        setAiResponse(
-          `⚠️ "${selectedLabel}" is not on this shelf.\n\n` +
-          (res.answer || 'Unable to determine which shelf this product is on.')
-        )
+        const userQuery = `The product "${selectedLabel}" is not on "${shelfName}". Which shelf or section in ${storeName} would I find it? Please be specific.`
+        const messages = buildMessagesFromHistory(chatHistory, userQuery)
+        const res = await sendChatQuery(messages)
+        setChatHistory((prev) => [
+          ...prev.slice(0, -1), // Remove 'Searching...'
+          { role: 'ai', text: `⚠️ "${selectedLabel}" is not on this shelf.\n\n${res.answer || 'Unable to determine which shelf this product is on.'}` }
+        ])
       } catch {
-        setAiResponse(`⚠️ "${selectedLabel}" is not available on this shelf.`)
+        setChatHistory((prev) => [
+          ...prev.slice(0, -1),
+          { role: 'ai', text: `⚠️ "${selectedLabel}" is not available on this shelf.` }
+        ])
       }
     }
   }
@@ -633,6 +691,23 @@ function ShelfExperiencePage({ store, layout, onBack }) {
     })
   }
 
+  const toggleSelectedProduct = (product) => {
+    const selectedId = product.id || product.name || product.product_name
+    setSelectedProducts((prev) => {
+      const alreadySelected = prev.some((item) => (item.id || item.name || item.product_name) === selectedId)
+      const updated = alreadySelected
+        ? prev.filter((item) => (item.id || item.name || item.product_name) !== selectedId)
+        : [...prev, product]
+      setSearchTerm(updated.map((item) => item.name || item.product_name || '').join(', '))
+      return updated
+    })
+  }
+
+  const isProductSelected = (product) => {
+    const selectedId = product.id || product.name || product.product_name
+    return selectedProducts.some((item) => (item.id || item.name || item.product_name) === selectedId)
+  }
+
   const handleAskAI = async () => {
     const query = searchTerm.trim()
     if (!query) return
@@ -643,12 +718,24 @@ function ShelfExperiencePage({ store, layout, onBack }) {
         ? `Answer only for these selected shelf products: ${selectedLabels.join(', ')}. User question: ${query}`
         : query
 
-    setAiResponse('Thinking...')
+    setChatHistory((prev) => [
+      ...prev,
+      { role: 'user', text: query },
+      { role: 'ai', text: 'Thinking...' }
+    ])
+
     try {
-      const res = await sendChatQuery(scopedQuery)
-      setAiResponse(res.answer || JSON.stringify(res))
+      const messages = buildMessagesFromHistory(chatHistory, scopedQuery)
+      const res = await sendChatQuery(messages)
+      setChatHistory((prev) => [
+        ...prev.slice(0, -1), // Remove 'Thinking...'
+        { role: 'ai', text: res.answer || JSON.stringify(res) }
+      ])
     } catch (err) {
-      setAiResponse('Error: ' + err.message)
+      setChatHistory((prev) => [
+        ...prev.slice(0, -1),
+        { role: 'ai', text: 'Error: ' + err.message }
+      ])
     }
   }
 
@@ -846,10 +933,25 @@ function ShelfExperiencePage({ store, layout, onBack }) {
         </button>
         <p className="shelf-page__eyebrow">AISLE {shelfMeta.aisleNumber}</p>
         <h1 className="shelf-page__title">{layout.name}</h1>
+        {/* <p className="shelf-page__subtitle">Digital shelf intelligence and real-time product guidance.</p> */}
         <p className="shelf-page__code-row">
           Shelf code{' '}
           <span className="shelf-page__code-badge">{shelfCodeDisplay}</span>
         </p>
+        <div className="shelf-page__header-metrics" aria-label="Shelf overview metrics">
+          {/* <span className="shelf-page__metric-pill">
+            <strong>Store</strong>
+            <em>{store?.name || 'Active Store'}</em>
+          </span> */}
+          <span className="shelf-page__metric-pill">
+            <strong>Products</strong>
+            <em>{products.length}</em>
+          </span>
+          <span className="shelf-page__metric-pill">
+            <strong>Selected</strong>
+            <em>{selectedProducts.length}</em>
+          </span>
+        </div>
 
         <button
           type="button"
@@ -916,7 +1018,7 @@ function ShelfExperiencePage({ store, layout, onBack }) {
       </div>
 
       {/* ── Body ── */}
-      <div className="shelf-page__body">
+      <div className="shelf-page__body shelf-page__body--elevated">
         {/* Selected product chips */}
         {selectedProducts.length > 0 && (
           <div className="shelf-page__chips">
@@ -954,7 +1056,6 @@ function ShelfExperiencePage({ store, layout, onBack }) {
               value={searchTerm}
               onChange={(e) => {
                 setSearchTerm(e.target.value)
-                setAiResponse('')
               }}
               onFocus={() => dropdownResults.length > 0 && setShowDropdown(true)}
               onBlur={() => setTimeout(() => setShowDropdown(false), 150)}
@@ -1023,12 +1124,40 @@ function ShelfExperiencePage({ store, layout, onBack }) {
         </div>
         {speechError && <p className="shelf-page__status shelf-page__status--voice">{speechError}</p>}
 
-        <textarea
-          className="shelf-page__ai-response"
-          readOnly
-          value={aiResponse}
-          placeholder="AI response will appear here..."
-        />
+
+        {/* WhatsApp-style chat history */}
+        <div className="shelf-page__chat-history" ref={chatHistoryRef}>
+          {chatHistory.length === 0 && (
+            <div className="shelf-page__chat-placeholder">AI response will appear here...</div>
+          )}
+          {chatHistory.map((msg, idx) => (
+            <div
+              key={idx}
+              className={
+                'shelf-page__chat-bubble ' +
+                (msg.role === 'user' ? 'shelf-page__chat-bubble--user' : 'shelf-page__chat-bubble--ai')
+              }
+            >
+              {(msg.text === 'Thinking...' || msg.text === 'Searching...') ? (
+                <span className="shelf-page__chat-loading">
+                  {msg.text}
+                  <span className="shelf-page__chat-dots" aria-hidden="true">
+                    <span />
+                    <span />
+                    <span />
+                  </span>
+                </span>
+              ) : (
+                msg.text.split('\n').map((line, i) => (
+                  <span key={i}>
+                    {line}
+                    {i < msg.text.split('\n').length - 1 && <br />}
+                  </span>
+                ))
+              )}
+            </div>
+          ))}
+        </div>
 
         {/* Products section */}
         <h2 className="shelf-page__products-heading">
@@ -1052,6 +1181,8 @@ function ShelfExperiencePage({ store, layout, onBack }) {
                 shelfFolder={shelfMeta.shelfCode}
                 expanded={expandedId === key}
                 onToggle={() => toggleProduct(key)}
+                selected={isProductSelected(product)}
+                onSelectToggle={() => toggleSelectedProduct(product)}
               />
             )
           })}

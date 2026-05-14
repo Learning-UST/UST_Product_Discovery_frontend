@@ -415,6 +415,16 @@ const buildUrl = (path, query) => {
 
 const isAbortError = (error) => error?.name === 'AbortError'
 
+const getErrorStatusCode = (error) => {
+    const message = String(error?.message || '')
+    const match = message.match(/(\d{3})/)
+    if (!match) {
+        return null
+    }
+    const status = Number.parseInt(match[1], 10)
+    return Number.isFinite(status) ? status : null
+}
+
 const fetchJson = async (path, query) => {
     const response = await fetch(buildUrl(path, query), {
         method: 'GET',
@@ -661,8 +671,16 @@ export const fetchPlanogramStores = async ({ identity } = {}) => {
                 hasIdentity: true,
             }
         }
-    } catch {
-        // Fall through to ID scan as absolute last resort
+    } catch (error) {
+        // For auth/client errors, ID scan is very noisy and usually invalid.
+        const status = getErrorStatusCode(error)
+        if (status === 400 || status === 401 || status === 403 || status === 404) {
+            return {
+                stores: [],
+                hasIdentity: Boolean(resolvedIdentity),
+            }
+        }
+        // Fall through to ID scan as absolute last resort for transient/network failures.
     }
 
     // 4. Last resort: ID scan — only runs when both REST calls above fail entirely
