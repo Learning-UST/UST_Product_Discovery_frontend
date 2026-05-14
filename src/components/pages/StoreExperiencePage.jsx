@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import './styles/StoreExperiencePage.css'
-import { getSpeechToken, fetchAllProducts, fetchDirectProductDetails, sendChatQuery } from '../../services/api'
+import { getSpeechToken, fetchAllProducts, fetchDirectProductDetails, sendChatQuery, sendAgentQuery } from '../../services/api'
 import * as SpeechSDK from 'microsoft-cognitiveservices-speech-sdk'
 import jsQR from 'jsqr'
 import { fuzzyFilter } from '../../utils/fuzzySearch'
@@ -281,22 +281,12 @@ function StoreExperiencePage({ store, onChangeStore, onLayoutSelect }) {
   }
 
   const handleSearchSubmit = async () => {
-    // This calls the Agentic Brain we built in Flask
-    const response = await fetch(`${API_BASE}/agent-query`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: searchTerm })
-    });
-    
-    const data = await response.json();
-    // The Agent's natural language answer
-    console.log("Agent Says:", data.answer); 
-    
-    // Logic to highlight products based on Agent's answer
-    if (data.answer.includes("Nissin")) {
-       // Trigger highlight in your Digital Twin UI
+    const data = await sendAgentQuery(searchTerm);
+    console.log('Agent Says:', data.answer);
+    if (data.answer && data.answer.includes('Nissin')) {
+      // Trigger highlight in your Digital Twin UI
     }
-};
+  };
 
   const handleVoiceSearch = async () => {
     if (!window.isSecureContext && window.location.hostname !== 'localhost') {

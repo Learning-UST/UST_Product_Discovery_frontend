@@ -61,6 +61,11 @@
   height: 1.35rem;
 }
 
+/* Place share button to the left of scanner button in the header */
+.shelf-page__share-corner-btn {
+  right: 4.2rem;
+}
+
 /* Scan modal overlay */
 .shelf-page__scan-modal-overlay {
   position: fixed;

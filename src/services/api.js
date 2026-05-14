@@ -1,7 +1,7 @@
 // Base URL for the Flask backend.
-// Override with VITE_FLASK_API_BASE when deploying (e.g. https://your-domain.com/flask-api).
-// NEVER use 127.0.0.1 in production — browsers block public→loopback requests.
-const FLASK_BASE_URL = (import.meta.env.VITE_FLASK_API_BASE || 'http://127.0.0.1:5000').replace(/\/$/, '');
+// Defaults to same-origin (empty string) so requests go to the current host via the Nginx /api proxy.
+// Override with VITE_FLASK_API_BASE only when the API lives on a different origin (e.g. https://api.example.com).
+const FLASK_BASE_URL = (import.meta.env.VITE_FLASK_API_BASE || '').replace(/\/$/, '');
 
 export const fetchAllProductsFull = async () => {
     const response = await fetch(`${FLASK_BASE_URL}/api/products`);
@@ -37,7 +37,7 @@ export const fetchProductById = async (id) => {
 };
 
 export const sendAgentQuery = async (query) => {
-    const response = await fetch(`${FLASK_BASE_URL}/agent-query`, {
+    const response = await fetch(`${FLASK_BASE_URL}/api/agent-query`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ query })
@@ -46,7 +46,7 @@ export const sendAgentQuery = async (query) => {
 };
 
 export const sendChatQuery = async (query) => {
-    const response = await fetch(`${FLASK_BASE_URL}/chat`, {
+    const response = await fetch(`${FLASK_BASE_URL}/api/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ query })
@@ -55,7 +55,7 @@ export const sendChatQuery = async (query) => {
 };
 
 export const getSpeechToken = async () => {
-    const response = await fetch(`${FLASK_BASE_URL}/speech-to-text`, {
+    const response = await fetch(`${FLASK_BASE_URL}/api/speech-to-text`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
     });

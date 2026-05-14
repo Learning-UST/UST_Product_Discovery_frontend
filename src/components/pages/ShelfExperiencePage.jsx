@@ -6,6 +6,9 @@ import { fuzzyFilter } from '../../utils/fuzzySearch'
 import './styles/ShelfExperiencePage.css'
 import jsQR from "jsqr";
 
+// Planogram 3D viewer host — override with VITE_PLANOGRAM_VIEWER_BASE_URL in .env for custom deployments.
+const PLANOGRAM_VIEWER_BASE_URL = (import.meta.env.VITE_PLANOGRAM_VIEWER_BASE_URL || 'https://planogram.fcust.com').replace(/\/$/, '')
+
 const trimValue = (value) => (typeof value === 'string' ? value.trim() : '')
 
 const extractShelfIdFromQrText = (rawValue) => {
@@ -435,6 +438,23 @@ function ShelfExperiencePage({ store, layout, onBack }) {
   const streamRef = useRef(null)
   const speechRecognizerRef = useRef(null)
 
+  const handleShareLink = async () => {
+    const shareUrl = window.location.href
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title: layout?.name || 'Shelf view',
+          url: shareUrl,
+        })
+        return
+      }
+      await navigator.clipboard.writeText(shareUrl)
+      setAiResponse('Link copied to clipboard.')
+    } catch {
+      setAiResponse('Unable to share link right now.')
+    }
+  }
+
   useEffect(() => {
     let cancelled = false
 
@@ -790,13 +810,20 @@ function ShelfExperiencePage({ store, layout, onBack }) {
           <span className="shelf-page__code-badge">{shelfCodeDisplay}</span>
         </p>
 
-        <div className="shelf-page__share-url">
-          <span className="url-label">Shareable Link:</span>
-          <code>{window.location.href}</code>
-          <button onClick={() => navigator.clipboard.writeText(window.location.href)}>
-            Copy
-          </button>
-        </div>
+        <button
+          type="button"
+          className="shelf-page__scan-corner-btn shelf-page__share-corner-btn"
+          aria-label="Share shelf link"
+          onClick={handleShareLink}
+          title="Share shelf link"
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+            <circle cx="18" cy="5" r="2.5" />
+            <circle cx="6" cy="12" r="2.5" />
+            <circle cx="18" cy="19" r="2.5" />
+            <path d="M8.3 11l7.4-4.1M8.3 13l7.4 4.1" strokeLinecap="round" />
+          </svg>
+        </button>
       </header>
 
       {/* ── Scan modal ── */}
@@ -833,7 +860,7 @@ function ShelfExperiencePage({ store, layout, onBack }) {
         {layout.id ? (
           <iframe
             className="shelf-page__viewer-iframe"
-            src={`https://planogram.fcust.com/viewer?shelfId=${encodeURIComponent(layout.id)}${
+            src={`${PLANOGRAM_VIEWER_BASE_URL}/viewer?shelfId=${encodeURIComponent(layout.id)}${
               highlightedProduct ? `&highlightProduct=${encodeURIComponent(highlightedProduct)}` : ''
             }`}
             title={`3D planogram view – ${layout.name || layout.id}`}
@@ -958,16 +985,6 @@ function ShelfExperiencePage({ store, layout, onBack }) {
           })}
         </ul>
       </div>
-
-      {/* ── Floating QR scan button ── */}
-      <button type="button" className="shelf-page__fab" aria-label="Scan QR code">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
-          <rect x="3" y="3" width="7" height="7" rx="1" />
-          <rect x="14" y="3" width="7" height="7" rx="1" />
-          <rect x="3" y="14" width="7" height="7" rx="1" />
-          <path d="M14 14h2v2h-2zM18 14h3M14 18v3M18 18h3v3h-3z" strokeLinecap="round" />
-        </svg>
-      </button>
     </div>
   )
 }
