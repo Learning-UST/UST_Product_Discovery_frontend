@@ -614,14 +614,13 @@ function ShelfExperiencePage({ store, layout, onBack, onQrShelfDetected, isQrLoa
     return /\?|\b(what|which|where|when|why|how|can|should|tell|show|find|recommend)\b/i.test(text)
   }
 
-  const buildMessagesFromHistory = (history, userQuery) => {
+  const buildMessagesFromHistory = (history) => {
     const mapped = history
       .filter((m) => m.role === 'user' || m.role === 'ai')
       .map((m) => ({
         role: m.role === 'user' ? 'user' : 'assistant',
         content: m.text,
       }))
-    mapped.push({ role: 'user', content: userQuery })
     return mapped
   }
 
@@ -673,7 +672,7 @@ function ShelfExperiencePage({ store, layout, onBack, onQrShelfDetected, isQrLoa
         const storeName = store?.name || 'this store'
         const shelfName = layout?.name || 'this shelf'
         const userQuery = `The product "${selectedLabel}" is not on "${shelfName}". Which shelf or section in ${storeName} would I find it? Please be specific.`
-        const messages = buildMessagesFromHistory(chatHistory, userQuery)
+        const messages = buildMessagesFromHistory(chatHistory)
         const res = await sendChatQuery(userQuery, messages)
         setChatHistory((prev) => [
           ...prev.slice(0, -1), // Remove 'Searching...'
@@ -726,7 +725,7 @@ function ShelfExperiencePage({ store, layout, onBack, onQrShelfDetected, isQrLoa
     ])
 
     try {
-      const messages = buildMessagesFromHistory(chatHistory, scopedQuery)
+      const messages = buildMessagesFromHistory(chatHistory)
       const res = await sendChatQuery(scopedQuery, messages)
       setChatHistory((prev) => [
         ...prev.slice(0, -1), // Remove 'Thinking...'

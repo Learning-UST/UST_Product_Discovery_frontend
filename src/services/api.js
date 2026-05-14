@@ -49,10 +49,11 @@ export const sendAgentQuery = async (query) => {
 // query: latest user prompt string
 // messages: [{role: 'user'|'assistant'|'system', content: string}, ...]
 export const sendChatQuery = async (query, messages) => {
+    const safeMessages = Array.isArray(messages) ? messages : [];
     const response = await fetch(`${FLASK_BASE_URL}/api/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query, messages })
+        body: JSON.stringify({ query, messages: safeMessages })
     });
     return response.json();
 };
