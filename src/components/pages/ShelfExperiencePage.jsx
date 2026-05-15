@@ -1041,11 +1041,6 @@ function ShelfExperiencePage({ store, layout, onBack, onQrShelfDetected, isQrLoa
   }, [])
 
   const handleVoiceSearch = async () => {
-    if (!window.isSecureContext && window.location.hostname !== 'localhost') {
-      setSpeechError('Voice search requires a secure context or localhost.')
-      return
-    }
-
     try {
       setSpeechError('')
       setIsListening(true)
