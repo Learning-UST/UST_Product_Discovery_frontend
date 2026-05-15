@@ -763,7 +763,9 @@ function ShelfExperiencePage({ store, layout, onBack, onQrShelfDetected, isQrLoa
         { role: 'ai', text: 'Searching...' }
       ])
       try {
-        const userQuery = selectedLabel
+        const storeName = store?.name || 'this store'
+        const shelfName = layout?.name || 'this shelf'
+        const userQuery = `The product "${selectedLabel}" is not on "${shelfName}". Which shelf or section would I find it? Please be specific.`
         const messages = buildMessagesFromHistory(chatHistory)
         const res = await sendChatQuery(userQuery, messages)
         setChatHistory((prev) => [
