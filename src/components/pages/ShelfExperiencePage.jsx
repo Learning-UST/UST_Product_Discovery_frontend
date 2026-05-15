@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import * as SpeechSDK from 'microsoft-cognitiveservices-speech-sdk'
 import { fetchLayoutById } from '../../services/planogramStoresApi'
-import { fetchAllProductsFull, fetchAllProducts, fetchDirectProductDetails, getSpeechToken, sendChatQuery } from '../../services/api'
+import { fetchAllProductsFull, fetchAllProducts, fetchDirectProductDetails, getSpeechToken, sendChatQuery, fetchProductById } from '../../services/api'
 import { fuzzyFilter } from '../../utils/fuzzySearch'
 import './styles/ShelfExperiencePage.css'
 import jsQR from "jsqr";
@@ -275,7 +275,7 @@ const parseNutrition = (facts) => {
   return { nutrients, ingredients }
 }
 
-function ProductCard({ product, shelfFolder, expanded, onToggle, selected, onSelectToggle }) {
+function ProductCard({ product, shelfFolder, expanded, onToggle, selected, onSelectToggle, source = 'shelf', isOffShelf = false }) {
   const EXTENSIONS = ['jpg', 'png', 'jpeg', 'webp']
   const brandLabel = product.brand ? product.brand.split(' ')[0] : (product.name || '?').split(' ')[0]
   const color = getBrandColor(product.brand, product.name)
@@ -354,7 +354,14 @@ function ProductCard({ product, shelfFolder, expanded, onToggle, selected, onSel
           </div>
         )}
         <div className="shelf-product__info">
-          <p className="shelf-product__name">{product.name || 'Unknown product'}</p>
+          <div className="shelf-product__header">
+            <p className="shelf-product__name">{product.name || 'Unknown product'}</p>
+            {source === 'chat' && (
+              <span className={`shelf-product__source-badge shelf-product__source-badge--${isOffShelf ? 'offshelft' : 'chat'}`}>
+                {isOffShelf ? '✨ From AI (not on shelf)' : '✨ From AI'}
+              </span>
+            )}
+          </div>
           <p className="shelf-product__meta">
             {[product.category, product.price != null ? `₹${Number(product.price).toFixed(2)}` : null]
               .filter(Boolean)
@@ -458,6 +465,7 @@ function ShelfExperiencePage({ store, layout, onBack, onQrShelfDetected, isQrLoa
   // WhatsApp-style chat history: array of {role: 'user'|'ai', text: string}
   const [chatHistory, setChatHistory] = useState([])
   const [expandedId, setExpandedId] = useState(null)
+  const [chatProducts, setChatProducts] = useState([])
   const [allStoreProducts, setAllStoreProducts] = useState([])
   const [dropdownResults, setDropdownResults] = useState([])
   const [showDropdown, setShowDropdown] = useState(false)
@@ -699,6 +707,7 @@ function ShelfExperiencePage({ store, layout, onBack, onQrShelfDetected, isQrLoa
     })
 
     setShowDropdown(false)
+    setSearchTerm('')
 
     const shelfMatch = products.find(
       (p) => (p.name || '').toLowerCase().trim() === pickedName
@@ -766,10 +775,50 @@ function ShelfExperiencePage({ store, layout, onBack, onQrShelfDetected, isQrLoa
     return selectedProducts.some((item) => (item.id || item.name || item.product_name) === selectedId)
   }
 
+  const fetchProductsByNames = async (names) => {
+    const fetched = []
+    for (const name of names) {
+      // First, try to match against shelf products by normalized name (fuzzy match)
+      const normalized = normalizeProductName(name)
+      const shelfMatch = products.find((p) => normalizeProductName(p.name) === normalized)
+      
+      if (shelfMatch) {
+        fetched.push(shelfMatch)
+        continue
+      }
+
+      // Fallback: try to fetch from DB using the name as ID (for products not on shelf)
+      try {
+        const result = await fetchProductById(name)
+        const raw = result?.data ?? result
+        const payload = Array.isArray(raw) ? raw[0] : raw
+        if (!payload || !(payload.name || payload.Name)) continue
+        fetched.push({
+          ...payload,
+          name: payload.name || payload.Name || payload.product_name || name,
+          brand: payload.brand || payload.Brand || '',
+          category: payload.category || payload.Category || '',
+          description: payload.description || payload.Description || '',
+          nutritional_facts: payload.nutritional_facts || payload.Nutritional_Facts || '',
+          image_url: payload.image_url || payload.imageUrl || '',
+          upc: payload.upc || payload.UPC || '',
+          price: payload.price ?? payload.Price ?? null,
+          diet_type: payload.diet_type || payload.Diet_Type || payload.Tags || payload.tags || '',
+          ingredients: payload.ingredients || payload.Ingredients || '',
+          id: payload.id || payload.UPC || payload.upc || name,
+        })
+      } catch {
+        // If DB lookup fails and shelf match fails, skip this product
+      }
+    }
+    return fetched
+  }
+
   const handleAskAI = async () => {
     const query = searchTerm.trim()
     if (!query) return
     setShowDropdown(false)
+    setSearchTerm('')
 
     const selectedLabels = getSelectedProductLabels()
     const scopedQuery =
@@ -790,15 +839,61 @@ function ShelfExperiencePage({ store, layout, onBack, onQrShelfDetected, isQrLoa
         ...prev.slice(0, -1), // Remove 'Thinking...'
         { role: 'ai', text: res.answer || JSON.stringify(res) }
       ])
+      // Extract product names: prefer sources/docs array, fall back to bullet-point lines in the answer text
+      let sourceNames = Array.isArray(res.sources || res.docs)
+        ? (res.sources || res.docs)
+            .map((d) => (typeof d === 'string' ? d : (d?.product || d?.name || d?.ProductName || d?.product_name || '')))
+            .map((s) => String(s).trim())
+            .filter(Boolean)
+            .slice(0, 5)
+        : []
+
+      if (sourceNames.length === 0 && res.answer) {
+        // Parse lines like "- Product Name" or "* Product Name" from the answer text
+        sourceNames = res.answer
+          .split('\n')
+          .map((line) => line.trim())
+          .filter((line) => /^[-*]\s+/.test(line))
+          .map((line) => line.replace(/^[-*]\s+/, '').trim())
+          .filter(Boolean)
+          .slice(0, 5)
+      }
+
+      const chatProds = sourceNames.length > 0 ? await fetchProductsByNames(sourceNames) : []
+      setChatProducts(chatProds)
     } catch (err) {
       setChatHistory((prev) => [
         ...prev.slice(0, -1),
         { role: 'ai', text: 'Error: ' + err.message }
       ])
+      setChatProducts([])
     }
   }
 
   const filteredProducts = searchTerm ? fuzzyFilter(products, searchTerm) : products
+
+  // Pinned ordering: selected first, then chat-source results, then remaining shelf products — no duplicates
+  // Track source for each product: 'selected', 'chat', or 'shelf'
+  const displayedProducts = useMemo(() => {
+    const seen = new Set()
+    const ordered = []
+    const addUnique = (p, source = 'shelf') => {
+      if (!p) return
+      const key = normalizeProductName(p.name || p.product_name || p.ProductName || String(p.id || ''))
+      if (!key || seen.has(key)) return
+      seen.add(key)
+      // For selected/chat items that are lightweight, try to fill from the enriched shelf list
+      const shelfVersion = products.find((sp) => normalizeProductName(sp.name) === key)
+      const finalProduct = shelfVersion || p
+      // Mark source: if found on shelf, it's from shelf; otherwise keep the original source
+      finalProduct._source = shelfVersion ? 'shelf' : source
+      ordered.push(finalProduct)
+    }
+    selectedProducts.forEach((p) => addUnique(p, 'selected'))
+    chatProducts.forEach((p) => addUnique(p, 'chat'))
+    filteredProducts.forEach((p) => addUnique(p, 'shelf'))
+    return ordered
+  }, [selectedProducts, chatProducts, filteredProducts, products])
 
   const toggleProduct = (key, product) => {
     setExpandedId((prev) => {
@@ -1186,7 +1281,15 @@ function ShelfExperiencePage({ store, layout, onBack, onQrShelfDetected, isQrLoa
                 }
               }}
               onBlur={() => setTimeout(() => setShowDropdown(false), 150)}
-              onKeyDown={(e) => { if (e.key === 'Enter' && !showDropdown) handleAskAI() }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  if (showDropdown && dropdownResults.length > 0) {
+                    handleSelectProduct(dropdownResults[0])
+                  } else {
+                    handleAskAI()
+                  }
+                }
+              }}
               autoComplete="off"
             />
             <button
@@ -1287,20 +1390,65 @@ function ShelfExperiencePage({ store, layout, onBack, onQrShelfDetected, isQrLoa
         </div>
 
         {/* Products section */}
-        <h2 className="shelf-page__products-heading">
-          Products on this shelf ({loading ? '…' : filteredProducts.length})
-        </h2>
+        {(() => {
+          // Check if any chat products are off-shelf
+          const offShelfChatProducts = chatProducts.filter(cp => {
+            const cpNormalized = normalizeProductName(cp.name || cp.product_name)
+            return !products.some(sp => normalizeProductName(sp.name) === cpNormalized)
+          })
+          const hasOffShelf = offShelfChatProducts.length > 0
+          const shelfOnlyCount = products.length
+          
+          return (
+            <>
+              <h2 className="shelf-page__products-heading">
+                {hasOffShelf
+                  ? `The similar products on this shelf are (${loading ? '…' : shelfOnlyCount})`
+                  : `Products on this shelf (${loading ? '…' : displayedProducts.length})`
+                }
+              </h2>
+              {hasOffShelf && (
+                <div className="shelf-page__off-shelf-intro">
+                  <p>Below products from AI are shown for comparison:</p>
+                </div>
+              )}
+            </>
+          )
+        })()}
 
         {loading && <p className="shelf-page__status">Loading shelf data…</p>}
         {error && <p className="shelf-page__error">{error}</p>}
 
-        {!loading && !error && filteredProducts.length === 0 && (
+        {!loading && !error && displayedProducts.length === 0 && (
           <p className="shelf-page__status">No products found{searchTerm ? ' for your search' : ' on this shelf'}.</p>
         )}
 
+        {/* Display off-shelf products info section */}
+        {(() => {
+          const offShelfChatProducts = chatProducts.filter(cp => {
+            const cpNormalized = normalizeProductName(cp.name || cp.product_name)
+            return !products.some(sp => normalizeProductName(sp.name) === cpNormalized)
+          })
+          return offShelfChatProducts.length > 0 ? (
+            <div className="shelf-page__off-shelf-section">
+              <p><strong>Products from AI (not on this shelf):</strong></p>
+              <ul className="shelf-page__off-shelf-list">
+                {offShelfChatProducts.map((product, i) => (
+                  <li key={product.id || i} className="shelf-page__off-shelf-item">
+                    <span className="shelf-page__off-shelf-name">{product.name || product.product_name}</span>
+                    {product.category && <span className="shelf-page__off-shelf-category">{product.category}</span>}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null
+        })()}
+
         <ul className="shelf-page__products" role="list">
-          {filteredProducts.map((product, i) => {
+          {displayedProducts.map((product, i) => {
             const key = product.id ?? i
+            const source = product._source || 'shelf'
+            const isOffShelf = source === 'chat' && !products.some(sp => normalizeProductName(sp.name) === normalizeProductName(product.name))
             return (
               <ProductCard
                 key={key}
@@ -1310,6 +1458,8 @@ function ShelfExperiencePage({ store, layout, onBack, onQrShelfDetected, isQrLoa
                 onToggle={() => toggleProduct(key, product)}
                 selected={isProductSelected(product)}
                 onSelectToggle={() => toggleSelectedProduct(product)}
+                source={source}
+                isOffShelf={isOffShelf}
               />
             )
           })}
