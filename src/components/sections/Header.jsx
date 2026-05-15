@@ -168,9 +168,9 @@ function Header({ onFeaturesClick, onStoresClick, onHowItWorksClick, onQrShelfDe
   return (
     <>
       <header className="top-nav">
-        <a className="brand" href="#home" aria-label="SmartShop home">
+        <a className="brand" href="#home" aria-label="Shopilot home">
           <span className="brand__mark">S</span>
-          <span className="brand__text">SmartShop</span>
+          <span className="brand__text">Shopilot</span>
         </a>
 
         <nav className="top-nav__menu" aria-label="Primary navigation">

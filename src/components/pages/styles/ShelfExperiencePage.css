@@ -1413,12 +1413,6 @@
   font-size: 0.9rem;
 }
 
-.shelf-page__off-shelf-item::before {
-  content: '✨';
-  flex-shrink: 0;
-  font-size: 1rem;
-}
-
 .shelf-page__off-shelf-name {
   font-weight: 600;
   color: #1f2937;

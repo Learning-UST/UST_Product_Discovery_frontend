@@ -181,6 +181,20 @@ const normalizeProductName = (value) =>
     .replace(/\s+/g, ' ')
     .trim()
 
+const extractUpcFromSourceId = (value) => {
+  const raw = String(value || '').trim()
+  if (!raw) return ''
+
+  // Common source formats: SKU_890123..., sku:890123..., or plain UPC value.
+  const skuMatch = raw.match(/sku[_:\-\s]*([a-z0-9]+)/i)
+  if (skuMatch?.[1]) return skuMatch[1]
+
+  // Accept only numeric UPC-like values when not prefixed with SKU.
+  if (/^\d{8,18}$/.test(raw)) return raw
+
+  return ''
+}
+
 // function ProductCard({ product, expanded, onToggle }) {
 //   const brandLabel = getBrandLabel(product)
 //   const color = product.brand_color || getBrandColor(product.brand, product.name)
@@ -235,6 +249,21 @@ const normalizeProductName = (value) =>
 //     </li>
 //   )
 // }
+
+const formatIngredients = (ingredients) => {
+  if (Array.isArray(ingredients)) {
+    return ingredients.join(', ');
+  }
+  if (typeof ingredients === 'string') {
+    // Split on capital letters or common delimiters, then join with commas
+    return ingredients
+      .split(/(?=[A-Z])|\s*[,;]\s*/)
+      .map((item) => item.trim())
+      .filter(Boolean)
+      .join(', ');
+  }
+  return '';
+};
 
 const parseNutrition = (facts) => {
   if (!facts) return { nutrients: [], ingredients: '' }
@@ -358,7 +387,7 @@ function ProductCard({ product, shelfFolder, expanded, onToggle, selected, onSel
             <p className="shelf-product__name">{product.name || 'Unknown product'}</p>
             {source === 'chat' && (
               <span className={`shelf-product__source-badge shelf-product__source-badge--${isOffShelf ? 'offshelft' : 'chat'}`}>
-                {isOffShelf ? '✨ From AI (not on shelf)' : '✨ From AI'}
+                {isOffShelf ? 'From AI (not on shelf)' : 'From AI'}
               </span>
             )}
           </div>
@@ -385,10 +414,6 @@ function ProductCard({ product, shelfFolder, expanded, onToggle, selected, onSel
             }}
             aria-pressed={selected}
           >
-            <svg className="shelf-product__select-icon" viewBox="0 0 20 20" fill="none" aria-hidden="true">
-              <circle cx="8.5" cy="8.5" r="5" stroke="currentColor" strokeWidth="1.6" />
-              <path d="M12.2 12.2l3.6 3.6" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-            </svg>
             <span>{selected ? 'Added' : 'Explore'}</span>
           </button>
           <span className={`shelf-product__chevron ${expanded ? 'is-open' : ''}`}>&#8964;</span>
@@ -599,7 +624,7 @@ function ShelfExperiencePage({ store, layout, onBack, onQrShelfDetected, isQrLoa
         await Promise.all(uniqueUpcs.map(async (upc) => {
           try {
             const res = await fetchDirectProductDetails(upc)
-            const fp = res?.data?.final_price
+            const fp = res?.data?.final_price ?? res?.final_price
             if (fp != null && fp !== '') priceMap[upc] = fp
           } catch {
             // Keep graceful fallback to bulk price when direct endpoint fails for an item.
@@ -697,6 +722,7 @@ function ShelfExperiencePage({ store, layout, onBack, onQrShelfDetected, isQrLoa
   const handleSelectProduct = async (storeProduct) => {
     const pickedName = (storeProduct.name || '').toLowerCase().trim()
     const selectedLabel = storeProduct.name || ''
+    setChatProducts([])
 
     setSelectedProducts((prev) => {
       const selectedId = storeProduct.id || storeProduct.name || storeProduct.product_name
@@ -775,6 +801,53 @@ function ShelfExperiencePage({ store, layout, onBack, onQrShelfDetected, isQrLoa
     return selectedProducts.some((item) => (item.id || item.name || item.product_name) === selectedId)
   }
 
+  const mapFetchedPayloadToProduct = (payload, fallbackValue) => {
+    if (!payload || !(payload.name || payload.Name || payload.product_name)) return null
+    return {
+      ...payload,
+      name: payload.name || payload.Name || payload.product_name || fallbackValue,
+      brand: payload.brand || payload.Brand || '',
+      category: payload.category || payload.Category || '',
+      description: payload.description || payload.Description || '',
+      nutritional_facts: payload.nutritional_facts || payload.Nutritional_Facts || '',
+      image_url: payload.image_url || payload.imageUrl || '',
+      upc: payload.upc || payload.UPC || '',
+      price: payload.price ?? payload.Price ?? null,
+      diet_type: payload.diet_type || payload.Diet_Type || payload.Tags || payload.tags || '',
+      ingredients: payload.ingredients || payload.Ingredients || '',
+      id: payload.id || payload.UPC || payload.upc || fallbackValue,
+    }
+  }
+
+  const fetchProductsByUpcs = async (upcs) => {
+    const fetched = []
+    const seen = new Set()
+
+    for (const upcValue of upcs) {
+      const upc = String(upcValue || '').trim()
+      if (!upc || seen.has(upc)) continue
+      seen.add(upc)
+
+      const shelfMatch = products.find((p) => String(p.upc || p.id || '').trim() === upc)
+      if (shelfMatch) {
+        fetched.push(shelfMatch)
+        continue
+      }
+
+      try {
+        const result = await fetchDirectProductDetails(upc)
+        const raw = result?.data ?? result
+        const payload = Array.isArray(raw) ? raw[0] : raw
+        const mapped = mapFetchedPayloadToProduct(payload, upc)
+        if (mapped) fetched.push(mapped)
+      } catch {
+        // Skip this source UPC when lookup fails.
+      }
+    }
+
+    return fetched
+  }
+
   const fetchProductsByNames = async (names) => {
     const fetched = []
     for (const name of names) {
@@ -792,21 +865,8 @@ function ShelfExperiencePage({ store, layout, onBack, onQrShelfDetected, isQrLoa
         const result = await fetchProductById(name)
         const raw = result?.data ?? result
         const payload = Array.isArray(raw) ? raw[0] : raw
-        if (!payload || !(payload.name || payload.Name)) continue
-        fetched.push({
-          ...payload,
-          name: payload.name || payload.Name || payload.product_name || name,
-          brand: payload.brand || payload.Brand || '',
-          category: payload.category || payload.Category || '',
-          description: payload.description || payload.Description || '',
-          nutritional_facts: payload.nutritional_facts || payload.Nutritional_Facts || '',
-          image_url: payload.image_url || payload.imageUrl || '',
-          upc: payload.upc || payload.UPC || '',
-          price: payload.price ?? payload.Price ?? null,
-          diet_type: payload.diet_type || payload.Diet_Type || payload.Tags || payload.tags || '',
-          ingredients: payload.ingredients || payload.Ingredients || '',
-          id: payload.id || payload.UPC || payload.upc || name,
-        })
+        const mapped = mapFetchedPayloadToProduct(payload, name)
+        if (mapped) fetched.push(mapped)
       } catch {
         // If DB lookup fails and shelf match fails, skip this product
       }
@@ -819,6 +879,7 @@ function ShelfExperiencePage({ store, layout, onBack, onQrShelfDetected, isQrLoa
     if (!query) return
     setShowDropdown(false)
     setSearchTerm('')
+    setChatProducts([])
 
     const selectedLabels = getSelectedProductLabels()
     const scopedQuery =
@@ -839,14 +900,25 @@ function ShelfExperiencePage({ store, layout, onBack, onQrShelfDetected, isQrLoa
         ...prev.slice(0, -1), // Remove 'Thinking...'
         { role: 'ai', text: res.answer || JSON.stringify(res) }
       ])
-      // Extract product names: prefer sources/docs array, fall back to bullet-point lines in the answer text
-      let sourceNames = Array.isArray(res.sources || res.docs)
-        ? (res.sources || res.docs)
-            .map((d) => (typeof d === 'string' ? d : (d?.product || d?.name || d?.ProductName || d?.product_name || '')))
-            .map((s) => String(s).trim())
-            .filter(Boolean)
-            .slice(0, 5)
-        : []
+      const rawSources = Array.isArray(res.sources || res.docs) ? (res.sources || res.docs) : []
+
+      // Primary strategy: extract source IDs, remove SKU_ prefix, and treat remaining value as UPC.
+      const sourceUpcs = rawSources
+        .map((d) => {
+          if (typeof d === 'string') return ''
+          return extractUpcFromSourceId(
+            d?.id || d?.source_id || d?.doc_id || d?.sku || d?.SKU || d?.product_id || ''
+          )
+        })
+        .filter(Boolean)
+        .slice(0, 5)
+
+      // Fallback strategy: extract product names from sources/docs or bullet points in answer text.
+      let sourceNames = rawSources
+        .map((d) => (typeof d === 'string' ? d : (d?.product || d?.name || d?.ProductName || d?.product_name || '')))
+        .map((s) => String(s).trim())
+        .filter(Boolean)
+        .slice(0, 5)
 
       if (sourceNames.length === 0 && res.answer) {
         // Parse lines like "- Product Name" or "* Product Name" from the answer text
@@ -859,7 +931,14 @@ function ShelfExperiencePage({ store, layout, onBack, onQrShelfDetected, isQrLoa
           .slice(0, 5)
       }
 
-      const chatProds = sourceNames.length > 0 ? await fetchProductsByNames(sourceNames) : []
+      let chatProds = []
+      if (sourceUpcs.length > 0) {
+        chatProds = await fetchProductsByUpcs(sourceUpcs)
+      }
+      if (chatProds.length === 0 && sourceNames.length > 0) {
+        chatProds = await fetchProductsByNames(sourceNames)
+      }
+
       setChatProducts(chatProds)
     } catch (err) {
       setChatHistory((prev) => [
@@ -1319,7 +1398,7 @@ function ShelfExperiencePage({ store, layout, onBack, onQrShelfDetected, isQrLoa
           <button
             type="button"
             className="shelf-page__ask-btn"
-            onClick={handleAskAI}
+            onClick={() => handleAskAI()}
             disabled={!searchTerm.trim()}
           >
             Ask AI
@@ -1376,15 +1455,15 @@ function ShelfExperiencePage({ store, layout, onBack, onQrShelfDetected, isQrLoa
             <>
               <h2 className="shelf-page__products-heading">
                 {hasOffShelf
-                  ? `The similar products on this shelf are (${loading ? '…' : shelfOnlyCount})`
+                  ? `The similar products are (${loading ? '…' : shelfOnlyCount})`
                   : `Products on this shelf (${loading ? '…' : displayedProducts.length})`
                 }
               </h2>
-              {hasOffShelf && (
+              {/* {hasOffShelf && (
                 <div className="shelf-page__off-shelf-intro">
-                  <p>Below products from AI are shown for comparison:</p>
+                  <p>Below products from AI are shown:</p>
                 </div>
-              )}
+              )} */}
             </>
           )
         })()}

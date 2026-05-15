@@ -27,7 +27,7 @@ export const fetchAllProducts = async () => {
 };
 
 export const fetchDirectProductDetails = async (upc) => {
-    const response = await fetch(`${FLASK_BASE_URL}/api/product/direct/${upc}`);
+    const response = await fetch(`${FLASK_BASE_URL}/api/product-click/${upc}`);
     return response.json();
 };
 

@@ -222,7 +222,7 @@ function App() {
     return (
       <div className="app-loader">
         <div className="spinner"></div>
-        <p>Initializing Digital Twin...</p>
+        <p>Initializing .....</p>
       </div>
     )
   }
