@@ -814,8 +814,8 @@ function ShelfExperiencePage({ store, layout, onBack, onQrShelfDetected, isQrLoa
     return fetched
   }
 
-  const handleAskAI = async () => {
-    const query = searchTerm.trim()
+  const handleAskAI = async (overrideQuery) => {
+    const query = String(overrideQuery ?? searchTerm).trim()
     if (!query) return
     setShowDropdown(false)
     setSearchTerm('')
@@ -1072,6 +1072,7 @@ function ShelfExperiencePage({ store, layout, onBack, onQrShelfDetected, isQrLoa
         (result) => {
           if (result.reason === SpeechSDK.ResultReason.RecognizedSpeech && result.text) {
             setSearchTerm(result.text)
+            void handleAskAI(result.text)
           } else if (result.reason === SpeechSDK.ResultReason.NoMatch) {
             setSpeechError('No speech was recognized. Please try again.')
           } else if (result.reason === SpeechSDK.ResultReason.Canceled) {
@@ -1102,9 +1103,6 @@ function ShelfExperiencePage({ store, layout, onBack, onQrShelfDetected, isQrLoa
   // The API response wraps layout_data; preview_image is not returned by this endpoint.
   // We display the 3D planogram viewer via iframe and fall back to a placeholder.
 
-  const shelfCodeDisplay = shelfMeta.shelfCode
-    || `SHELF-A${layout.id}`
-
   return (
     <div className="shelf-page">
       {/* ── Header ── */}
@@ -1134,26 +1132,6 @@ function ShelfExperiencePage({ store, layout, onBack, onQrShelfDetected, isQrLoa
           </svg>
         </button>
         <p className="shelf-page__eyebrow">AISLE {shelfMeta.aisleNumber}</p>
-        <h1 className="shelf-page__title">{layout.name}</h1>
-        {/* <p className="shelf-page__subtitle">Digital shelf intelligence and real-time product guidance.</p> */}
-        <p className="shelf-page__code-row">
-          Shelf code{' '}
-          <span className="shelf-page__code-badge">{shelfCodeDisplay}</span>
-        </p>
-        <div className="shelf-page__header-metrics" aria-label="Shelf overview metrics">
-          {/* <span className="shelf-page__metric-pill">
-            <strong>Store</strong>
-            <em>{store?.name || 'Active Store'}</em>
-          </span> */}
-          <span className="shelf-page__metric-pill">
-            <strong>Products</strong>
-            <em>{products.length}</em>
-          </span>
-          <span className="shelf-page__metric-pill">
-            <strong>Selected</strong>
-            <em>{selectedProducts.length}</em>
-          </span>
-        </div>
 
         <button
           type="button"
