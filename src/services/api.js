@@ -27,12 +27,30 @@ export const fetchAllProducts = async () => {
 };
 
 export const fetchDirectProductDetails = async (upc) => {
-    const response = await fetch(`${FLASK_BASE_URL}/api/product-click/${upc}`);
+    const encodedUpc = encodeURIComponent(String(upc || ''));
+
+    // Prefer the enriched direct endpoint for full details (metadata + inventory + promo/final price).
+    let response = await fetch(`${FLASK_BASE_URL}/api/product/direct/${encodedUpc}`);
+    if (response.ok) {
+        return response.json();
+    }
+
+    // Fallback to legacy click endpoint if direct endpoint is unavailable.
+    response = await fetch(`${FLASK_BASE_URL}/api/product-click/${encodedUpc}`);
     return response.json();
 };
 
 export const fetchProductById = async (id) => {
-    const response = await fetch(`${FLASK_BASE_URL}/api/products/${encodeURIComponent(id)}`);
+    const encodedId = encodeURIComponent(String(id || ''));
+
+    // Name lookup endpoint for off-shelf AI results.
+    let response = await fetch(`${FLASK_BASE_URL}/api/product/name/${encodedId}`);
+    if (response.ok) {
+        return response.json();
+    }
+
+    // Fallback for environments exposing a generic products by id route.
+    response = await fetch(`${FLASK_BASE_URL}/api/products/${encodedId}`);
     return response.json();
 };
 

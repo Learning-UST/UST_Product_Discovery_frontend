@@ -304,7 +304,7 @@ const parseNutrition = (facts) => {
   return { nutrients, ingredients }
 }
 
-function ProductCard({ product, shelfFolder, expanded, onToggle, selected, onSelectToggle, source = 'shelf', isOffShelf = false }) {
+function ProductCard({ product, shelfFolder, expanded, onToggle, selected, onSelectToggle, source = 'shelf', isOffShelf = false, isAiResult = false }) {
   const EXTENSIONS = ['jpg', 'png', 'jpeg', 'webp']
   const brandLabel = product.brand ? product.brand.split(' ')[0] : (product.name || '?').split(' ')[0]
   const color = getBrandColor(product.brand, product.name)
@@ -351,9 +351,24 @@ function ProductCard({ product, shelfFolder, expanded, onToggle, selected, onSel
 
   const { nutrients, ingredients: parsedIngredients } = parseNutrition(product.nutritional_facts)
   const ingredientsList = product.ingredients || parsedIngredients
+  const formattedIngredients = formatIngredients(ingredientsList)
+  const renderSourceBadge = (extraClass = '') => (
+    source === 'chat' ? (
+      <span className={`shelf-product__source-badge shelf-product__source-badge--${isOffShelf ? 'offshelft' : 'chat'} ${extraClass}`.trim()}>
+        {isOffShelf ? (
+          <>
+            {/* <span className="shelf-product__source-badge-text">From AI</span> */}
+            <span className="shelf-product__source-badge-sub">(not on shelf)</span>
+          </>
+        ) : (
+          <span className="shelf-product__source-badge-text">From AI</span>
+        )}
+      </span>
+    ) : null
+  )
 
   return (
-    <li className="shelf-product">
+    <li className={`shelf-product ${isAiResult ? 'shelf-product--ai-result' : ''}`}>
       <div
         className="shelf-product__main"
         role="button"
@@ -385,11 +400,7 @@ function ProductCard({ product, shelfFolder, expanded, onToggle, selected, onSel
         <div className="shelf-product__info">
           <div className="shelf-product__header">
             <p className="shelf-product__name">{product.name || 'Unknown product'}</p>
-            {source === 'chat' && (
-              <span className={`shelf-product__source-badge shelf-product__source-badge--${isOffShelf ? 'offshelft' : 'chat'}`}>
-                {isOffShelf ? 'From AI (not on shelf)' : 'From AI'}
-              </span>
-            )}
+            {renderSourceBadge('shelf-product__source-badge--desktop')}
           </div>
           <p className="shelf-product__meta">
             {[product.category, product.price != null ? `₹${Number(product.price).toFixed(2)}` : null]
@@ -416,6 +427,7 @@ function ProductCard({ product, shelfFolder, expanded, onToggle, selected, onSel
           >
             <span>{selected ? 'Added' : 'Explore'}</span>
           </button>
+          {renderSourceBadge('shelf-product__source-badge--mobile')}
           <span className={`shelf-product__chevron ${expanded ? 'is-open' : ''}`}>&#8964;</span>
         </div>
       </div>
@@ -466,10 +478,10 @@ function ProductCard({ product, shelfFolder, expanded, onToggle, selected, onSel
                   </div>
                 </>
               )}
-              {ingredientsList && (
+              {formattedIngredients && (
                 <>
                   <p className="shelf-product__detail-section-heading"><strong>Ingredients</strong></p>
-                  <p className="shelf-product__detail-ingredients">{ingredientsList}</p>
+                  <p className="shelf-product__detail-ingredients">{formattedIngredients}</p>
                 </>
               )}
             </div>
@@ -509,6 +521,7 @@ function ShelfExperiencePage({ store, layout, onBack, onQrShelfDetected, isQrLoa
   const canvasRef = useRef(null)
   const qrScanLoopRef = useRef(null)
   const chatHistoryRef = useRef(null)
+  const catalogProductsRef = useRef(null)
 
   const viewerHighlightedProducts = useMemo(() => {
     const shelfNameByNormalized = new Map()
@@ -801,22 +814,127 @@ function ShelfExperiencePage({ store, layout, onBack, onQrShelfDetected, isQrLoa
     return selectedProducts.some((item) => (item.id || item.name || item.product_name) === selectedId)
   }
 
+  const readFirstValue = (payload, keys) => {
+    for (const key of keys) {
+      const value = payload?.[key]
+      if (value !== undefined && value !== null && value !== '') {
+        return value
+      }
+    }
+    return ''
+  }
+
   const mapFetchedPayloadToProduct = (payload, fallbackValue) => {
-    if (!payload || !(payload.name || payload.Name || payload.product_name)) return null
+    if (!payload) return null
+
+    const resolvedName = readFirstValue(payload, ['name', 'Name', 'product_name', 'ProductName', 'productName'])
+    if (!resolvedName && !fallbackValue) return null
+
     return {
       ...payload,
-      name: payload.name || payload.Name || payload.product_name || fallbackValue,
-      brand: payload.brand || payload.Brand || '',
-      category: payload.category || payload.Category || '',
-      description: payload.description || payload.Description || '',
-      nutritional_facts: payload.nutritional_facts || payload.Nutritional_Facts || '',
-      image_url: payload.image_url || payload.imageUrl || '',
-      upc: payload.upc || payload.UPC || '',
-      price: payload.price ?? payload.Price ?? null,
-      diet_type: payload.diet_type || payload.Diet_Type || payload.Tags || payload.tags || '',
-      ingredients: payload.ingredients || payload.Ingredients || '',
-      id: payload.id || payload.UPC || payload.upc || fallbackValue,
+      name: resolvedName || fallbackValue,
+      brand: readFirstValue(payload, ['brand', 'Brand']),
+      category: readFirstValue(payload, ['category', 'Category']),
+      description: readFirstValue(payload, ['description', 'Description']),
+      nutritional_facts: readFirstValue(payload, ['nutritional_facts', 'Nutritional_Facts', 'Nutritional Facts']),
+      image_url: readFirstValue(payload, ['image_url', 'imageUrl', 'Image_URL', 'ImageUrl']),
+      upc: readFirstValue(payload, ['upc', 'UPC']),
+      price: payload.price ?? payload.Price ?? payload.final_price ?? payload.Final_Price ?? null,
+      diet_type: readFirstValue(payload, ['diet_type', 'Diet_Type', 'Diet Type', 'Tags', 'tags']),
+      ingredients: readFirstValue(payload, ['ingredients', 'Ingredients', 'Ingredient_List', 'ingredient_list']),
+      id: readFirstValue(payload, ['id', 'UPC', 'upc']) || fallbackValue,
     }
+  }
+
+  const hasCompleteDetails = (product) =>
+    Boolean(product?.description) && Boolean(product?.nutritional_facts) && Boolean(product?.ingredients)
+
+  const getCatalogProducts = async () => {
+    if (Array.isArray(catalogProductsRef.current)) {
+      return catalogProductsRef.current
+    }
+
+    try {
+      const items = await fetchAllProductsFull()
+      catalogProductsRef.current = Array.isArray(items) ? items : []
+    } catch {
+      catalogProductsRef.current = []
+    }
+
+    return catalogProductsRef.current
+  }
+
+  const enrichProductDetails = async (product, fallbackValue = '') => {
+    if (!product || hasCompleteDetails(product)) return product
+
+    const lookupCandidates = [product.upc, product.id, product.name, fallbackValue]
+      .map((value) => String(value || '').trim())
+      .filter(Boolean)
+
+    for (const lookup of lookupCandidates) {
+      try {
+        const result = await fetchProductById(lookup)
+        const raw = result?.data ?? result
+        const payload = Array.isArray(raw) ? raw[0] : raw
+        const mapped = mapFetchedPayloadToProduct(payload, lookup)
+        if (!mapped) continue
+
+        return {
+          ...mapped,
+          ...product,
+          name: product.name || mapped.name,
+          brand: product.brand || mapped.brand,
+          category: product.category || mapped.category,
+          description: product.description || mapped.description,
+          nutritional_facts: product.nutritional_facts || mapped.nutritional_facts,
+          ingredients: product.ingredients || mapped.ingredients,
+          diet_type: product.diet_type || mapped.diet_type,
+          image_url: product.image_url || mapped.image_url,
+          upc: product.upc || mapped.upc,
+          price: product.price ?? mapped.price ?? null,
+          id: product.id || mapped.id,
+        }
+      } catch {
+        // Try next candidate lookup.
+      }
+    }
+
+    // Final fallback: search full catalog and merge details by UPC or normalized name.
+    const catalogProducts = await getCatalogProducts()
+    if (catalogProducts.length > 0) {
+      const normalizedName = normalizeProductName(product.name || fallbackValue)
+      const matchedCatalog = catalogProducts.find((item) => {
+        const itemUpc = String(readFirstValue(item, ['upc', 'UPC']) || '').trim()
+        const productUpc = String(product.upc || '').trim()
+        if (productUpc && itemUpc && productUpc === itemUpc) return true
+
+        const itemName = normalizeProductName(readFirstValue(item, ['name', 'Name', 'product_name', 'ProductName']))
+        return normalizedName && itemName && normalizedName === itemName
+      })
+
+      if (matchedCatalog) {
+        const mappedCatalog = mapFetchedPayloadToProduct(matchedCatalog, fallbackValue)
+        if (mappedCatalog) {
+          return {
+            ...mappedCatalog,
+            ...product,
+            name: product.name || mappedCatalog.name,
+            brand: product.brand || mappedCatalog.brand,
+            category: product.category || mappedCatalog.category,
+            description: product.description || mappedCatalog.description,
+            nutritional_facts: product.nutritional_facts || mappedCatalog.nutritional_facts,
+            ingredients: product.ingredients || mappedCatalog.ingredients,
+            diet_type: product.diet_type || mappedCatalog.diet_type,
+            image_url: product.image_url || mappedCatalog.image_url,
+            upc: product.upc || mappedCatalog.upc,
+            price: product.price ?? mappedCatalog.price ?? null,
+            id: product.id || mappedCatalog.id,
+          }
+        }
+      }
+    }
+
+    return product
   }
 
   const fetchProductsByUpcs = async (upcs) => {
@@ -839,7 +957,10 @@ function ShelfExperiencePage({ store, layout, onBack, onQrShelfDetected, isQrLoa
         const raw = result?.data ?? result
         const payload = Array.isArray(raw) ? raw[0] : raw
         const mapped = mapFetchedPayloadToProduct(payload, upc)
-        if (mapped) fetched.push(mapped)
+        if (mapped) {
+          const enriched = await enrichProductDetails(mapped, upc)
+          fetched.push(enriched)
+        }
       } catch {
         // Skip this source UPC when lookup fails.
       }
@@ -866,7 +987,10 @@ function ShelfExperiencePage({ store, layout, onBack, onQrShelfDetected, isQrLoa
         const raw = result?.data ?? result
         const payload = Array.isArray(raw) ? raw[0] : raw
         const mapped = mapFetchedPayloadToProduct(payload, name)
-        if (mapped) fetched.push(mapped)
+        if (mapped) {
+          const enriched = await enrichProductDetails(mapped, name)
+          fetched.push(enriched)
+        }
       } catch {
         // If DB lookup fails and shelf match fails, skip this product
       }
@@ -973,6 +1097,13 @@ function ShelfExperiencePage({ store, layout, onBack, onQrShelfDetected, isQrLoa
     filteredProducts.forEach((p) => addUnique(p, 'shelf'))
     return ordered
   }, [selectedProducts, chatProducts, filteredProducts, products])
+
+  const aiResultNameSet = useMemo(() => {
+    const names = chatProducts
+      .map((product) => normalizeProductName(product.name || product.product_name || product.ProductName || ''))
+      .filter(Boolean)
+    return new Set(names)
+  }, [chatProducts])
 
   const toggleProduct = (key, product) => {
     setExpandedId((prev) => {
@@ -1475,32 +1606,12 @@ function ShelfExperiencePage({ store, layout, onBack, onQrShelfDetected, isQrLoa
           <p className="shelf-page__status">No products found{searchTerm ? ' for your search' : ' on this shelf'}.</p>
         )}
 
-        {/* Display off-shelf products info section */}
-        {(() => {
-          const offShelfChatProducts = chatProducts.filter(cp => {
-            const cpNormalized = normalizeProductName(cp.name || cp.product_name)
-            return !products.some(sp => normalizeProductName(sp.name) === cpNormalized)
-          })
-          return offShelfChatProducts.length > 0 ? (
-            <div className="shelf-page__off-shelf-section">
-              <p><strong>Products from AI (not on this shelf):</strong></p>
-              <ul className="shelf-page__off-shelf-list">
-                {offShelfChatProducts.map((product, i) => (
-                  <li key={product.id || i} className="shelf-page__off-shelf-item">
-                    <span className="shelf-page__off-shelf-name">{product.name || product.product_name}</span>
-                    {product.category && <span className="shelf-page__off-shelf-category">{product.category}</span>}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ) : null
-        })()}
-
         <ul className="shelf-page__products" role="list">
           {displayedProducts.map((product, i) => {
             const key = product.id ?? i
             const source = product._source || 'shelf'
             const isOffShelf = source === 'chat' && !products.some(sp => normalizeProductName(sp.name) === normalizeProductName(product.name))
+            const isAiResult = aiResultNameSet.has(normalizeProductName(product.name || product.product_name || product.ProductName || ''))
             return (
               <ProductCard
                 key={key}
@@ -1512,6 +1623,7 @@ function ShelfExperiencePage({ store, layout, onBack, onQrShelfDetected, isQrLoa
                 onSelectToggle={() => toggleSelectedProduct(product)}
                 source={source}
                 isOffShelf={isOffShelf}
+                isAiResult={isAiResult}
               />
             )
           })}

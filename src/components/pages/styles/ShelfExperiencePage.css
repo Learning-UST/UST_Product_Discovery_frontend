@@ -334,7 +334,6 @@
 }
 
 .shelf-page__code-badge {
-  display: inline-block;
   border: 1.5px solid #7aaa90;
   border-radius: 999px;
   padding: 0.2rem 0.75rem;
@@ -346,23 +345,10 @@
 
 /* ── Planogram viewer ── */
 .shelf-page__viewer-wrap {
-  width: 100%;
-  background: #fff;
+  width: min(1100px, calc(100% - 2rem));
+  margin: -1rem auto 0;
+  border-radius: 1rem;
   overflow: hidden;
-}
-
-.shelf-page__viewer-iframe {
-  width: 100%;
-  height: 520px;
-  border: none;
-  display: block;
-}
-
-.shelf-page__viewer-img {
-  width: 100%;
-  max-height: 420px;
-  object-fit: cover;
-  display: block;
 }
 
 .shelf-page__viewer-fallback {
@@ -1134,6 +1120,82 @@
   .shelf-page__viewer-iframe {
     height: 260px;
   }
+
+  .shelf-product {
+    min-height: 6rem;
+  }
+
+  .shelf-product__main {
+    align-items: flex-start;
+    padding: 0.8rem 0.85rem;
+  }
+
+  .shelf-product__header {
+    flex-direction: row;
+    align-items: center;
+    gap: 0.4rem;
+  }
+
+  .shelf-product__name {
+    flex: 1;
+    min-width: 0;
+    white-space: normal;
+    display: -webkit-box;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow: hidden;
+  }
+
+  .shelf-product__right {
+    display: grid;
+    grid-template-columns: auto auto;
+    align-items: center;
+    justify-items: end;
+    column-gap: 0.45rem;
+    row-gap: 0.25rem;
+  }
+
+  .shelf-product__select-btn {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .shelf-product__chevron {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .shelf-product__source-badge {
+    max-width: 100%;
+    display: inline-flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 0.18rem;
+    white-space: normal;
+    line-height: 1.2;
+    padding: 0.2rem 0.5rem;
+    font-size: 0.66rem;
+  }
+
+  .shelf-product__source-badge-sub {
+    margin-left: 0.05rem;
+    font-size: 0.66rem;
+    line-height: 1.2;
+  }
+
+  .shelf-product__source-badge--desktop {
+    display: none !important;
+  }
+
+  .shelf-product__source-badge--mobile {
+    display: inline-flex !important;
+    grid-column: 1 / -1;
+    grid-row: 2;
+    justify-self: end;
+    max-width: 9.4rem;
+    text-align: right;
+  }
 }
 
 /* --- Product card highlight state from parent search/selection --- */
@@ -1305,6 +1367,13 @@
   border-color: #cbd9d0;
 }
 
+.shelf-product--ai-result {
+  border-color: #5b21b6;
+  box-shadow:
+    0 0 0 2px #8b5cf640,
+    0 10px 22px #6d28d91f;
+}
+
 .shelf-product__detail {
   border-top: 1px solid #e8eeea;
   background: linear-gradient(180deg, #fbfdfb 0%, #f5f9f6 100%);
@@ -1337,7 +1406,10 @@
 }
 
 .shelf-product__source-badge {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  align-self: center;
   border-radius: 999px;
   padding: 0.25rem 0.7rem;
   font-family: 'Manrope', sans-serif;
@@ -1345,6 +1417,27 @@
   font-weight: 600;
   white-space: nowrap;
   flex-shrink: 0;
+}
+
+.shelf-product__source-badge-text {
+  display: inline;
+  font-weight: 700;
+}
+
+.shelf-product__source-badge-sub {
+  display: inline;
+  font-weight: 600;
+  margin-left: 0.2rem;
+  opacity: 0.96;
+}
+
+.shelf-product__source-badge--desktop {
+  display: none;
+}
+
+.shelf-product__source-badge--mobile {
+  display: inline-flex;
+  order: -1;
 }
 
 .shelf-product__source-badge--chat {
