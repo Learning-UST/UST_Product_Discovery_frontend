@@ -713,6 +713,13 @@ function ShelfExperiencePage({ store, layout, onBack, onQrShelfDetected, isQrLoa
     })
   }
 
+  const clearChatHistory = () => {
+    setChatHistory([])
+    setChatProducts([])
+    setExpandedId(null)
+    setHighlightedProduct('')
+  }
+
   const isQuestionInput = (value) => {
     const text = value.trim()
     if (!text) return false
@@ -814,13 +821,51 @@ function ShelfExperiencePage({ store, layout, onBack, onQrShelfDetected, isQrLoa
     return selectedProducts.some((item) => (item.id || item.name || item.product_name) === selectedId)
   }
 
-  const readFirstValue = (payload, keys) => {
-    for (const key of keys) {
-      const value = payload?.[key]
-      if (value !== undefined && value !== null && value !== '') {
-        return value
+  const normalizeFieldKey = (value) =>
+    String(value || '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, '')
+
+  const isNonEmptyValue = (value) => value !== undefined && value !== null && value !== ''
+
+  const getPayloadSources = (payload) => {
+    if (!payload || typeof payload !== 'object') return []
+
+    const sources = [payload]
+    const nestedKeys = ['data', 'product', 'product_info', 'productInfo', 'details', 'detail', 'item', 'metadata']
+
+    for (const key of nestedKeys) {
+      const nested = payload?.[key]
+      if (nested && typeof nested === 'object' && !Array.isArray(nested)) {
+        sources.push(nested)
       }
     }
+
+    return sources
+  }
+
+  const readFirstValue = (payload, keys) => {
+    const sources = getPayloadSources(payload)
+    if (sources.length === 0) return ''
+
+    const normalizedKeySet = new Set(keys.map((key) => normalizeFieldKey(key)))
+
+    for (const source of sources) {
+      for (const key of keys) {
+        const value = source?.[key]
+        if (isNonEmptyValue(value)) {
+          return value
+        }
+      }
+
+      for (const [field, value] of Object.entries(source)) {
+        if (!isNonEmptyValue(value)) continue
+        if (normalizedKeySet.has(normalizeFieldKey(field))) {
+          return value
+        }
+      }
+    }
+
     return ''
   }
 
@@ -836,12 +881,12 @@ function ShelfExperiencePage({ store, layout, onBack, onQrShelfDetected, isQrLoa
       brand: readFirstValue(payload, ['brand', 'Brand']),
       category: readFirstValue(payload, ['category', 'Category']),
       description: readFirstValue(payload, ['description', 'Description']),
-      nutritional_facts: readFirstValue(payload, ['nutritional_facts', 'Nutritional_Facts', 'Nutritional Facts']),
+      nutritional_facts: readFirstValue(payload, ['nutritional_facts', 'Nutritional_Facts', 'Nutritional Facts', 'nutrition_facts', 'nutrition', 'nutrition_data']),
       image_url: readFirstValue(payload, ['image_url', 'imageUrl', 'Image_URL', 'ImageUrl']),
       upc: readFirstValue(payload, ['upc', 'UPC']),
       price: payload.price ?? payload.Price ?? payload.final_price ?? payload.Final_Price ?? null,
       diet_type: readFirstValue(payload, ['diet_type', 'Diet_Type', 'Diet Type', 'Tags', 'tags']),
-      ingredients: readFirstValue(payload, ['ingredients', 'Ingredients', 'Ingredient_List', 'ingredient_list']),
+      ingredients: readFirstValue(payload, ['ingredients', 'Ingredients', 'Ingredient_List', 'ingredient_list', 'ingredient', 'Ingredients_List']),
       id: readFirstValue(payload, ['id', 'UPC', 'upc']) || fallbackValue,
     }
   }
@@ -971,9 +1016,14 @@ function ShelfExperiencePage({ store, layout, onBack, onQrShelfDetected, isQrLoa
 
   const fetchProductsByNames = async (names) => {
     const fetched = []
+    const seen = new Set()
+
     for (const name of names) {
-      // First, try to match against shelf products by normalized name (fuzzy match)
       const normalized = normalizeProductName(name)
+      if (!normalized || seen.has(normalized)) continue
+      seen.add(normalized)
+
+      // First, try to match against shelf products by normalized name (fuzzy match)
       const shelfMatch = products.find((p) => normalizeProductName(p.name) === normalized)
       
       if (shelfMatch) {
@@ -981,20 +1031,36 @@ function ShelfExperiencePage({ store, layout, onBack, onQrShelfDetected, isQrLoa
         continue
       }
 
+      let mapped = null
+
       // Fallback: try to fetch from DB using the name as ID (for products not on shelf)
       try {
         const result = await fetchProductById(name)
         const raw = result?.data ?? result
         const payload = Array.isArray(raw) ? raw[0] : raw
-        const mapped = mapFetchedPayloadToProduct(payload, name)
-        if (mapped) {
-          const enriched = await enrichProductDetails(mapped, name)
-          fetched.push(enriched)
-        }
+        mapped = mapFetchedPayloadToProduct(payload, name)
       } catch {
-        // If DB lookup fails and shelf match fails, skip this product
+        // Continue to catalog fallback.
+      }
+
+      if (!mapped) {
+        const catalogProducts = await getCatalogProducts()
+        const catalogMatch = catalogProducts.find((item) => {
+          const itemName = normalizeProductName(readFirstValue(item, ['name', 'Name', 'product_name', 'ProductName']))
+          return normalized === itemName
+        })
+
+        if (catalogMatch) {
+          mapped = mapFetchedPayloadToProduct(catalogMatch, name)
+        }
+      }
+
+      if (mapped) {
+        const enriched = await enrichProductDetails(mapped, name)
+        fetched.push(enriched)
       }
     }
+
     return fetched
   }
 
@@ -1539,6 +1605,17 @@ function ShelfExperiencePage({ store, layout, onBack, onQrShelfDetected, isQrLoa
 
 
         {/* WhatsApp-style chat history */}
+        <div className="shelf-page__chat-toolbar">
+          <span className="shelf-page__chat-title">Chat history</span>
+          <button
+            type="button"
+            className="shelf-page__chat-clear-btn"
+            onClick={clearChatHistory}
+            disabled={chatHistory.length === 0}
+          >
+            Clear chat
+          </button>
+        </div>
         <div className="shelf-page__chat-history" ref={chatHistoryRef}>
           {chatHistory.length === 0 && (
             <div className="shelf-page__chat-placeholder">AI response will appear here...</div>
