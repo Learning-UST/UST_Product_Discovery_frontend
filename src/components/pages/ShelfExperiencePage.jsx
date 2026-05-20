@@ -1123,47 +1123,140 @@ function ShelfExperiencePage({ store, layout, onBack, onQrShelfDetected, isQrLoa
       const rawSources = Array.isArray(res.sources || res.docs) ? (res.sources || res.docs) : []
       const answerText = res.answer || ''
 
-      // PRIMARY STRATEGY: Extract product names directly from the answer text by matching catalog products
-      // This finds which products from the shelf are actually mentioned in the AI response
-      let mentionedProductNames = []
-      if (answerText) {
-        const answerLower = answerText.toLowerCase()
-        mentionedProductNames = products
-          .map((p) => p.name || p.product_name || p.ProductName || '')
+      const extractNamesFromTextList = (text) => {
+        if (!text) return []
+        const lines = String(text)
+          .split('\n')
+          .map((line) => line.trim())
           .filter(Boolean)
-          .filter((productName) => {
-            const productNameLower = productName.toLowerCase()
-            return answerLower.includes(productNameLower)
-          })
+
+        const extracted = []
+        for (const line of lines) {
+          const numbered = line.match(/^\d+\.\s+(.+)$/)
+          const bulleted = line.match(/^[-*]\s+(.+)$/)
+          const raw = numbered?.[1] || bulleted?.[1] || ''
+          if (!raw) continue
+
+          const [beforeHyphen] = raw.split(/\s[-–—]\s/)
+          const cleaned = beforeHyphen
+            .replace(/\bprice\s*[:\-].*$/i, '')
+            .replace(/[.;:,]\s*$/, '')
+            .trim()
+
+          if (cleaned.length >= 3) extracted.push(cleaned)
+        }
+
+        const unique = []
+        const seen = new Set()
+        extracted.forEach((name) => {
+          const normalized = normalizeProductName(name)
+          if (!normalized || seen.has(normalized)) return
+          seen.add(normalized)
+          unique.push(name)
+        })
+        return unique
       }
 
+      const allKnownNames = [
+        ...products.map((p) => p?.name || p?.product_name || p?.ProductName || ''),
+        ...allStoreProducts.map((p) => p?.name || p?.product_name || p?.ProductName || p?.Name || ''),
+      ]
+        .map((name) => String(name || '').trim())
+        .filter(Boolean)
+
+      const answerLineNames = extractNamesFromTextList(answerText)
+
+      const sourceTextValues = rawSources
+        .flatMap((d) => {
+          if (typeof d === 'string') return [d]
+          return [
+            d?.product,
+            d?.name,
+            d?.ProductName,
+            d?.product_name,
+            d?.title,
+            d?.text,
+            d?.content,
+            d?.page_content,
+            d?.summary,
+            d?.chunk,
+          ]
+        })
+        .map((v) => String(v || '').trim())
+        .filter(Boolean)
+
+      const sourceLineNames = extractNamesFromTextList(sourceTextValues.join('\n'))
+
+      const nameByNormalized = new Map()
+      ;[...allKnownNames, ...answerLineNames, ...sourceLineNames].forEach((name) => {
+        const normalized = normalizeProductName(name)
+        if (!normalized || nameByNormalized.has(normalized)) return
+        nameByNormalized.set(normalized, name)
+      })
+
+      const normalizedAnswer = normalizeProductName(answerText)
+      const answerNameSet = new Set()
+      answerLineNames.forEach((name) => {
+        const normalized = normalizeProductName(name)
+        if (normalized) answerNameSet.add(normalized)
+      })
+      nameByNormalized.forEach((name, normalized) => {
+        if (normalizedAnswer && normalizedAnswer.includes(normalized)) {
+          answerNameSet.add(normalized)
+        }
+      })
+
+      const sourceUpcs = rawSources
+        .map((d) => {
+          if (typeof d === 'string') return ''
+          return extractUpcFromSourceId(
+            d?.id || d?.source_id || d?.doc_id || d?.sku || d?.SKU || d?.product_id || ''
+          )
+        })
+        .filter(Boolean)
+
+      const sourceNameValues = rawSources
+        .map((d) => (typeof d === 'string' ? d : (d?.product || d?.name || d?.ProductName || d?.product_name || '')))
+        .map((s) => String(s || '').trim())
+        .filter(Boolean)
+
+      const sourceNameSet = new Set(
+        sourceNameValues
+          .map((name) => normalizeProductName(name))
+          .filter(Boolean)
+      )
+      sourceLineNames.forEach((name) => {
+        const normalized = normalizeProductName(name)
+        if (normalized) sourceNameSet.add(normalized)
+      })
+
+      const normalizedSourceBlob = normalizeProductName(sourceTextValues.join(' '))
+      nameByNormalized.forEach((_, normalized) => {
+        if (normalizedSourceBlob && normalizedSourceBlob.includes(normalized)) {
+          sourceNameSet.add(normalized)
+        }
+      })
+
+      // Source/doc-first behavior: list all products coming from sources/docs.
       let chatProds = []
+      if (sourceUpcs.length > 0) {
+        chatProds = await fetchProductsByUpcs(sourceUpcs)
+      }
 
-      // Use mentioned products first (PRIMARY: products extracted from answer text)
-      if (mentionedProductNames.length > 0) {
-        chatProds = await fetchProductsByNames(mentionedProductNames)
-      } else {
-        // FALLBACK: If no products found in answer text, try extracting from sources/docs
-        const sourceUpcs = rawSources
-          .map((d) => {
-            if (typeof d === 'string') return ''
-            return extractUpcFromSourceId(
-              d?.id || d?.source_id || d?.doc_id || d?.sku || d?.SKU || d?.product_id || ''
-            )
-          })
-          .filter(Boolean)
+      if (sourceNameValues.length > 0) {
+        const nameProducts = await fetchProductsByNames(sourceNameValues)
+        const seen = new Set(
+          chatProds
+            .map((p) => normalizeProductName(p?.name || p?.product_name || p?.ProductName || p?.id || ''))
+            .filter(Boolean)
+        )
 
-        const sourceNames = rawSources
-          .map((d) => (typeof d === 'string' ? d : (d?.product || d?.name || d?.ProductName || d?.product_name || '')))
-          .map((s) => String(s).trim())
-          .filter(Boolean)
-
-        if (sourceUpcs.length > 0) {
-          chatProds = await fetchProductsByUpcs(sourceUpcs)
-        }
-        if (chatProds.length === 0 && sourceNames.length > 0) {
-          chatProds = await fetchProductsByNames(sourceNames)
-        }
+        nameProducts.forEach((p) => {
+          const key = normalizeProductName(p?.name || p?.product_name || p?.ProductName || p?.id || '')
+          if (!key || seen.has(key)) return
+          seen.add(key)
+          chatProds.push(p)
+        })
       }
 
       setChatProducts(chatProds)
