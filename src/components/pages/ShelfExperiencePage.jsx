@@ -191,6 +191,11 @@ const pickConfiguredPrice = (source = {}) => {
   return source.Price ?? source.price ?? source.final_price ?? source.Final_Price ?? null
 }
 
+const pickDisplayedPrice = (source = {}) => {
+  if (!source || typeof source !== 'object') return null
+  return source.final_price ?? source.Final_Price ?? source.discounted_price ?? source.discountedPrice ?? pickConfiguredPrice(source)
+}
+
 const extractUpcFromSourceId = (value) => {
   const raw = String(value || '').trim()
   if (!raw) return ''
@@ -648,12 +653,12 @@ function ShelfExperiencePage({ store, layout, onBack, onQrShelfDetected, isQrLoa
           try {
             const res = await fetchDirectProductDetails(upc)
             const payload = res?.data ?? res
-            const configuredPrice =
-              pickConfiguredPrice(payload)
-              ?? pickConfiguredPrice(payload?.inventory)
-              ?? pickConfiguredPrice(payload?.inventory_record)
-              ?? pickConfiguredPrice(payload?.inventoryData)
-            if (configuredPrice != null && configuredPrice !== '') priceMap[upc] = configuredPrice
+            const discountedPrice =
+              pickDisplayedPrice(payload)
+              ?? pickDisplayedPrice(payload?.inventory)
+              ?? pickDisplayedPrice(payload?.inventory_record)
+              ?? pickDisplayedPrice(payload?.inventoryData)
+            if (discountedPrice != null && discountedPrice !== '') priceMap[upc] = discountedPrice
           } catch {
             // Keep graceful fallback to bulk price when direct endpoint fails for an item.
           }
@@ -909,7 +914,7 @@ function ShelfExperiencePage({ store, layout, onBack, onQrShelfDetected, isQrLoa
       nutritional_facts: readFirstValue(payload, ['nutritional_facts', 'Nutritional_Facts', 'Nutritional Facts', 'nutrition_facts', 'nutrition', 'nutrition_data']),
       image_url: readFirstValue(payload, ['image_url', 'imageUrl', 'Image_URL', 'ImageUrl']),
       upc: readFirstValue(payload, ['upc', 'UPC']),
-      price: pickConfiguredPrice(payload),
+      price: pickDisplayedPrice(payload),
       diet_type: readFirstValue(payload, ['diet_type', 'Diet_Type', 'Diet Type', 'Tags', 'tags']),
       ingredients: readFirstValue(payload, ['ingredients', 'Ingredients', 'Ingredient_List', 'ingredient_list', 'ingredient', 'Ingredients_List']),
       id: readFirstValue(payload, ['id', 'UPC', 'upc']) || fallbackValue,
