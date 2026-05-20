@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+// Read config for price field
+const USE_US_PRICE = String(import.meta.env.VITE_USE_US_PRICE || '').toLowerCase() === 'true'
 import * as SpeechSDK from 'microsoft-cognitiveservices-speech-sdk'
 import { fetchLayoutById } from '../../services/planogramStoresApi'
 import { fetchAllProductsFull, fetchAllProducts, fetchDirectProductDetails, getSpeechToken, sendChatQuery, fetchProductById } from '../../services/api'
@@ -144,7 +146,7 @@ const parseProducts = (rawLayoutData) => {
           name: productName,
           id: cat.id ?? productName,
           category: cat.category || '',
-          price: cat.price ?? null,
+          price: USE_US_PRICE ? cat.US_Price ?? cat.us_price ?? null : cat.price ?? null,
           brand: cat.brand || '',
           imageUrl: cat.imageUrl || cat.image_url || '',
           modelUrl: cat.modelUrl || cat.model_url || '',
@@ -180,6 +182,14 @@ const normalizeProductName = (value) =>
     .replace(/[^a-z0-9\s]/g, '')
     .replace(/\s+/g, ' ')
     .trim()
+
+const pickConfiguredPrice = (source = {}) => {
+  if (!source || typeof source !== 'object') return null
+  if (USE_US_PRICE) {
+    return source.US_Price ?? source.us_price ?? source.usprice ?? source.Price ?? source.price ?? null
+  }
+  return source.Price ?? source.price ?? source.final_price ?? source.Final_Price ?? null
+}
 
 const extractUpcFromSourceId = (value) => {
   const raw = String(value || '').trim()
@@ -403,7 +413,7 @@ function ProductCard({ product, shelfFolder, expanded, onToggle, selected, onSel
             {renderSourceBadge('shelf-product__source-badge--desktop')}
           </div>
           <p className="shelf-product__meta">
-            {[product.category, product.price != null ? `₹${Number(product.price).toFixed(2)}` : null]
+            {[product.category, product.price != null ? `${USE_US_PRICE ? '$' : '₹'}${Number(product.price).toFixed(2)}` : null]
               .filter(Boolean)
               .join(' · ')}
           </p>
@@ -449,7 +459,7 @@ function ProductCard({ product, shelfFolder, expanded, onToggle, selected, onSel
               <div className="shelf-product__detail-title-row">
                 <p className="shelf-product__detail-name">{product.name}</p>
                 {product.price != null && (
-                  <span className="shelf-product__detail-price">₹{Number(product.price).toFixed(2)}</span>
+                  <span className="shelf-product__detail-price">{USE_US_PRICE ? '$' : '₹'}{Number(product.price).toFixed(2)}</span>
                 )}
               </div>
               {product.category && (
@@ -622,7 +632,7 @@ function ShelfExperiencePage({ store, layout, onBack, onQrShelfDetected, isQrLoa
           if (key) cosmosMap[key] = p
         }
 
-        // Fetch only final_price from direct endpoint using UPC and map it by UPC
+        // Fetch configured price from direct endpoint using UPC and map it by UPC
         const uniqueUpcs = [...new Set(
           layoutProducts
             .map((lp) => {
@@ -637,8 +647,13 @@ function ShelfExperiencePage({ store, layout, onBack, onQrShelfDetected, isQrLoa
         await Promise.all(uniqueUpcs.map(async (upc) => {
           try {
             const res = await fetchDirectProductDetails(upc)
-            const fp = res?.data?.final_price ?? res?.final_price
-            if (fp != null && fp !== '') priceMap[upc] = fp
+            const payload = res?.data ?? res
+            const configuredPrice =
+              pickConfiguredPrice(payload)
+              ?? pickConfiguredPrice(payload?.inventory)
+              ?? pickConfiguredPrice(payload?.inventory_record)
+              ?? pickConfiguredPrice(payload?.inventoryData)
+            if (configuredPrice != null && configuredPrice !== '') priceMap[upc] = configuredPrice
           } catch {
             // Keep graceful fallback to bulk price when direct endpoint fails for an item.
           }
@@ -659,7 +674,17 @@ function ShelfExperiencePage({ store, layout, onBack, onQrShelfDetected, isQrLoa
             nutritional_facts:cp ? (cp.Nutritional_Facts || cp.nutritional_facts || '') : '',
             upc:              cp ? (cp.UPC || cp.upc || lp.upc) : lp.upc,
             image_url:        cp ? (cp.image_url || cp.imageUrl || '') : '',
-            price:            priceMap[String(resolvedUpc)] ?? (cp ? (cp.Price ?? cp.price ?? lp.price ?? null) : (lp.price ?? null)),
+            price:            priceMap[String(resolvedUpc)]
+              ?? (cp
+                ? (USE_US_PRICE
+                    ? (cp.US_Price ?? cp.us_price ?? cp.usprice ?? cp.Price ?? cp.price ?? lp.US_Price ?? lp.us_price ?? lp.usprice ?? lp.price ?? null)
+                    : (cp.Price ?? cp.price ?? lp.price ?? null)
+                  )
+                : (USE_US_PRICE
+                    ? (lp.US_Price ?? lp.us_price ?? lp.usprice ?? lp.price ?? null)
+                    : (lp.price ?? null)
+                  )
+              ),
             diet_type:        cp ? (cp.Diet_Type || cp.diet_type || cp.Tags || cp.tags || '') : '',
             ingredients:      cp ? (cp.Ingredients || cp.ingredients || '') : '',
             stock_count:      lp.stock_count,
@@ -884,7 +909,7 @@ function ShelfExperiencePage({ store, layout, onBack, onQrShelfDetected, isQrLoa
       nutritional_facts: readFirstValue(payload, ['nutritional_facts', 'Nutritional_Facts', 'Nutritional Facts', 'nutrition_facts', 'nutrition', 'nutrition_data']),
       image_url: readFirstValue(payload, ['image_url', 'imageUrl', 'Image_URL', 'ImageUrl']),
       upc: readFirstValue(payload, ['upc', 'UPC']),
-      price: payload.price ?? payload.Price ?? payload.final_price ?? payload.Final_Price ?? null,
+      price: pickConfiguredPrice(payload),
       diet_type: readFirstValue(payload, ['diet_type', 'Diet_Type', 'Diet Type', 'Tags', 'tags']),
       ingredients: readFirstValue(payload, ['ingredients', 'Ingredients', 'Ingredient_List', 'ingredient_list', 'ingredient', 'Ingredients_List']),
       id: readFirstValue(payload, ['id', 'UPC', 'upc']) || fallbackValue,
@@ -1091,42 +1116,49 @@ function ShelfExperiencePage({ store, layout, onBack, onQrShelfDetected, isQrLoa
         { role: 'ai', text: res.answer || JSON.stringify(res) }
       ])
       const rawSources = Array.isArray(res.sources || res.docs) ? (res.sources || res.docs) : []
+      const answerText = res.answer || ''
 
-      // Primary strategy: extract source IDs, remove SKU_ prefix, and treat remaining value as UPC.
-      const sourceUpcs = rawSources
-        .map((d) => {
-          if (typeof d === 'string') return ''
-          return extractUpcFromSourceId(
-            d?.id || d?.source_id || d?.doc_id || d?.sku || d?.SKU || d?.product_id || ''
-          )
-        })
-        .filter(Boolean)
-        .slice(0, 5)
-
-      // Fallback strategy: extract product names from sources/docs or bullet points in answer text.
-      let sourceNames = rawSources
-        .map((d) => (typeof d === 'string' ? d : (d?.product || d?.name || d?.ProductName || d?.product_name || '')))
-        .map((s) => String(s).trim())
-        .filter(Boolean)
-        .slice(0, 5)
-
-      if (sourceNames.length === 0 && res.answer) {
-        // Parse lines like "- Product Name" or "* Product Name" from the answer text
-        sourceNames = res.answer
-          .split('\n')
-          .map((line) => line.trim())
-          .filter((line) => /^[-*]\s+/.test(line))
-          .map((line) => line.replace(/^[-*]\s+/, '').trim())
+      // PRIMARY STRATEGY: Extract product names directly from the answer text by matching catalog products
+      // This finds which products from the shelf are actually mentioned in the AI response
+      let mentionedProductNames = []
+      if (answerText) {
+        const answerLower = answerText.toLowerCase()
+        mentionedProductNames = products
+          .map((p) => p.name || p.product_name || p.ProductName || '')
           .filter(Boolean)
-          .slice(0, 5)
+          .filter((productName) => {
+            const productNameLower = productName.toLowerCase()
+            return answerLower.includes(productNameLower)
+          })
       }
 
       let chatProds = []
-      if (sourceUpcs.length > 0) {
-        chatProds = await fetchProductsByUpcs(sourceUpcs)
-      }
-      if (chatProds.length === 0 && sourceNames.length > 0) {
-        chatProds = await fetchProductsByNames(sourceNames)
+
+      // Use mentioned products first (PRIMARY: products extracted from answer text)
+      if (mentionedProductNames.length > 0) {
+        chatProds = await fetchProductsByNames(mentionedProductNames)
+      } else {
+        // FALLBACK: If no products found in answer text, try extracting from sources/docs
+        const sourceUpcs = rawSources
+          .map((d) => {
+            if (typeof d === 'string') return ''
+            return extractUpcFromSourceId(
+              d?.id || d?.source_id || d?.doc_id || d?.sku || d?.SKU || d?.product_id || ''
+            )
+          })
+          .filter(Boolean)
+
+        const sourceNames = rawSources
+          .map((d) => (typeof d === 'string' ? d : (d?.product || d?.name || d?.ProductName || d?.product_name || '')))
+          .map((s) => String(s).trim())
+          .filter(Boolean)
+
+        if (sourceUpcs.length > 0) {
+          chatProds = await fetchProductsByUpcs(sourceUpcs)
+        }
+        if (chatProds.length === 0 && sourceNames.length > 0) {
+          chatProds = await fetchProductsByNames(sourceNames)
+        }
       }
 
       setChatProducts(chatProds)
@@ -1532,11 +1564,9 @@ function ShelfExperiencePage({ store, layout, onBack, onQrShelfDetected, isQrLoa
               onBlur={() => setTimeout(() => setShowDropdown(false), 150)}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
-                  if (showDropdown && dropdownResults.length > 0) {
-                    handleSelectProduct(dropdownResults[0])
-                  } else {
-                    handleAskAI()
-                  }
+                  e.preventDefault()
+                  setShowDropdown(false)
+                  handleAskAI()
                 }
               }}
               autoComplete="off"

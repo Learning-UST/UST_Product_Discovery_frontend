@@ -435,11 +435,25 @@
   border: none;
   cursor: pointer;
   color: #0a3f2b;
-  font-size: 0.75rem;
+  font-size: 1rem;
+  font-weight: 700;
   line-height: 1;
+  width: 1.55rem;
+  height: 1.55rem;
+  border-radius: 999px;
   padding: 0;
   display: flex;
   align-items: center;
+  justify-content: center;
+}
+
+.shelf-page__chip-remove:hover {
+  background: #0a3f2b1a;
+}
+
+.shelf-page__chip-remove:focus-visible {
+  outline: 2px solid #0a3f2b66;
+  outline-offset: 1px;
 }
 
 /* ── Search row ── */
@@ -1107,6 +1121,12 @@
 
 /* ── Responsive ── */
 @media (width <= 640px) {
+  .shelf-page__chip-remove {
+    width: 2rem;
+    height: 2rem;
+    font-size: 1.1rem;
+  }
+
   .shelf-page__viewer-iframe {
     height: 260px;
   }
