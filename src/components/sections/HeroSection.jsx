@@ -1,6 +1,10 @@
 import Button from '../ui/Button'
 
-function HeroSection({ onStoresClick, onFeaturesClick }) {
+function HeroSection({ onStoresClick, onFeaturesClick, currency = 'USD' }) {
+  const isInrMode = String(currency || '').toUpperCase() === 'INR'
+  const featuredPrice = isInrMode ? 120 : 1.49
+  const priceLabel = `${isInrMode ? '₹' : '$'}${featuredPrice.toFixed(2)}`
+
   return (
     <section id="home" className="hero-section">
       <div className="hero-section__content">
@@ -33,7 +37,7 @@ function HeroSection({ onStoresClick, onFeaturesClick }) {
         <div className="hero-product__details">
           <h3 className="hero-product__name">Starbucks Doubleshot Energy Coffee Mocha (15 fl oz)</h3>
           <p className="hero-product__meta">Your shelf favorite</p>
-          <span className="hero-product__price">₹120.00</span>
+          <span className="hero-product__price">{priceLabel}</span>
         </div>
       </div>
     </section>

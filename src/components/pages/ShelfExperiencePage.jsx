@@ -1120,7 +1120,10 @@ function ShelfExperiencePage({ store, layout, onBack, onQrShelfDetected, isQrLoa
         ...prev.slice(0, -1), // Remove 'Thinking...'
         { role: 'ai', text: res.answer || JSON.stringify(res) }
       ])
-      const rawSources = Array.isArray(res.sources || res.docs) ? (res.sources || res.docs) : []
+      const sourcePayload = res.sources ?? res.docs
+      const rawSources = Array.isArray(sourcePayload)
+        ? sourcePayload
+        : (Array.isArray(sourcePayload?.results) ? sourcePayload.results : [])
       const answerText = res.answer || ''
 
       const extractNamesFromTextList = (text) => {
@@ -1216,7 +1219,7 @@ function ShelfExperiencePage({ store, layout, onBack, onQrShelfDetected, isQrLoa
         .filter(Boolean)
 
       const sourceNameValues = rawSources
-        .map((d) => (typeof d === 'string' ? d : (d?.product || d?.name || d?.ProductName || d?.product_name || '')))
+        .map((d) => (typeof d === 'string' ? d : (d?.product || d?.name || d?.ProductName || d?.product_name || d?.title || d?.description || '')))
         .map((s) => String(s || '').trim())
         .filter(Boolean)
 
@@ -1237,26 +1240,59 @@ function ShelfExperiencePage({ store, layout, onBack, onQrShelfDetected, isQrLoa
         }
       })
 
-      // Source/doc-first behavior: list all products coming from sources/docs.
+      const responseProductNames = Array.isArray(res.product_names)
+        ? res.product_names.map((name) => String(name || '').trim()).filter(Boolean)
+        : []
+
+      // Prefer backend-provided product_names from chat response.
       let chatProds = []
-      if (sourceUpcs.length > 0) {
-        chatProds = await fetchProductsByUpcs(sourceUpcs)
-      }
+      if (responseProductNames.length > 0) {
+        chatProds = await fetchProductsByNames(responseProductNames)
+      } else {
+        if (sourceUpcs.length > 0) {
+          chatProds = await fetchProductsByUpcs(sourceUpcs)
+        }
 
-      if (sourceNameValues.length > 0) {
-        const nameProducts = await fetchProductsByNames(sourceNameValues)
-        const seen = new Set(
-          chatProds
-            .map((p) => normalizeProductName(p?.name || p?.product_name || p?.ProductName || p?.id || ''))
+        if (sourceNameValues.length > 0) {
+          const nameProducts = await fetchProductsByNames(sourceNameValues)
+          const seen = new Set(
+            chatProds
+              .map((p) => normalizeProductName(p?.name || p?.product_name || p?.ProductName || p?.id || ''))
+              .filter(Boolean)
+          )
+
+          nameProducts.forEach((p) => {
+            const key = normalizeProductName(p?.name || p?.product_name || p?.ProductName || p?.id || '')
+            if (!key || seen.has(key)) return
+            seen.add(key)
+            chatProds.push(p)
+          })
+        }
+
+        if (chatProds.length === 0 && rawSources.length > 0) {
+          const sourceFallbackProducts = rawSources
+            .map((item, index) => {
+              if (!item || typeof item === 'string') return null
+
+              const sourceId = item?.id || item?.source_id || item?.doc_id || item?.sku || item?.SKU || item?.product_id || ''
+              const derivedUpc = extractUpcFromSourceId(sourceId)
+
+              return {
+                id: sourceId || item?.product_id || `source-${index}`,
+                name: item?.name || item?.product || item?.product_name || item?.ProductName || item?.title || answerLineNames[index] || sourceId || `Product ${index + 1}`,
+                brand: item?.brand || '',
+                category: item?.category || '',
+                description: item?.description || '',
+                image_url: item?.image_url || item?.imageUrl || '',
+                upc: derivedUpc || '',
+                price: pickDisplayedPrice(item),
+                stock_count: item?.stock ?? item?.quantity ?? null,
+              }
+            })
             .filter(Boolean)
-        )
 
-        nameProducts.forEach((p) => {
-          const key = normalizeProductName(p?.name || p?.product_name || p?.ProductName || p?.id || '')
-          if (!key || seen.has(key)) return
-          seen.add(key)
-          chatProds.push(p)
-        })
+          chatProds = sourceFallbackProducts
+        }
       }
 
       setChatProducts(chatProds)

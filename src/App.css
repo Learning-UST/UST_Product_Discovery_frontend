@@ -104,3 +104,112 @@ main { overflow: clip; }
   .content-section { width: calc(100% - 1.2rem); padding: 2.8rem 0; }
   .features-grid, .stores-grid, .steps-grid { grid-template-columns: 1fr; gap: 1rem; }
 }
+
+.app-runtime-footer {
+  border-top: 1px solid var(--border-color);
+  background: linear-gradient(180deg, #f4f4f1 0%, #eceee9 100%);
+  padding: 1rem 0 1.2rem;
+}
+
+.app-runtime-footer__inner {
+  width: var(--section-width);
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  justify-content: space-between;
+}
+
+.app-runtime-footer__label {
+  margin: 0;
+  color: var(--text-muted);
+  font-family: 'Manrope', sans-serif;
+  font-size: 0.9rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.app-runtime-footer__groups {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  flex-wrap: wrap;
+}
+
+.app-runtime-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  border: 1px solid #cfd7d0;
+  border-radius: 999px;
+  background: #ffffff;
+  padding: 0.25rem 0.3rem 0.25rem 0.65rem;
+}
+
+.app-runtime-toggle__title {
+  color: #4e5f57;
+  font-family: 'Manrope', sans-serif;
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.app-runtime-toggle__buttons {
+  display: inline-flex;
+  align-items: center;
+  background: #ecf0eb;
+  border-radius: 999px;
+  padding: 0.15rem;
+}
+
+.app-runtime-toggle__btn {
+  border: 0;
+  background: transparent;
+  color: #4a5e54;
+  cursor: pointer;
+  min-width: 64px;
+  padding: 0.42rem 0.75rem;
+  border-radius: 999px;
+  font-family: 'Manrope', sans-serif;
+  font-size: 0.84rem;
+  font-weight: 700;
+  transition: background-color 0.2s ease, color 0.2s ease, transform 0.2s ease;
+}
+
+.app-runtime-toggle__btn:hover {
+  transform: translateY(-1px);
+}
+
+.app-runtime-toggle__btn.is-active {
+  background: #0d5537;
+  color: #ffffff;
+}
+
+.app-runtime-toggle__btn:focus-visible {
+  outline: 2px solid #0d553780;
+  outline-offset: 1px;
+}
+
+@media (width <= 720px) {
+  .app-runtime-footer__inner {
+    width: calc(100% - 1.2rem);
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .app-runtime-footer__groups {
+    width: 100%;
+    gap: 0.6rem;
+  }
+
+  .app-runtime-toggle {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .app-runtime-toggle__btn {
+    min-width: 58px;
+  }
+}

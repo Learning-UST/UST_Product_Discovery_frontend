@@ -97,6 +97,7 @@ import HowItWorksSection from './components/sections/HowItWorksSection'
 import StoresSection from './components/sections/StoresSection'
 import { useSmoothScroll } from './hooks/useSmoothScroll'
 import { fetchLayoutById, fetchPlanogramStoreById } from './services/planogramStoresApi'
+import { getRuntimePreferences, setRuntimePreferences } from './services/api'
 import './App.css'
 
 const trimValue = (value) => (typeof value === 'string' ? value.trim() : '')
@@ -146,6 +147,7 @@ function App() {
   const [activeStore, setActiveStore] = useState(null)
   const [activeLayout, setActiveLayout] = useState(null)
   const [isAutoLoading, setIsAutoLoading] = useState(false)
+  const [runtimePrefs, setRuntimePrefs] = useState(() => getRuntimePreferences())
 
   const { scrollToSection } = useSmoothScroll()
 
@@ -182,6 +184,10 @@ function App() {
     }
   }, []) // Run ONLY once on mount
 
+  useEffect(() => {
+    setRuntimePreferences(runtimePrefs)
+  }, [runtimePrefs])
+
   // ── LOGIC 2: Sync URL when user navigates manually ──
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
@@ -215,6 +221,14 @@ function App() {
 
   const handleBackToStore = () => {
     setActiveLayout(null)
+  }
+
+  const handleCurrencyToggle = (currency) => {
+    setRuntimePrefs((prev) => ({ ...prev, currency }))
+  }
+
+  const handleCloudToggle = (cloudProvider) => {
+    setRuntimePrefs((prev) => ({ ...prev, cloudProvider }))
   }
 
   // Loading state for QR scan redirection
@@ -259,11 +273,61 @@ function App() {
         isQrLoading={isAutoLoading}
       />
       <main>
-        <HeroSection onStoresClick={handleStoresClick} onFeaturesClick={handleFeaturesClick} />
+        <HeroSection
+          onStoresClick={handleStoresClick}
+          onFeaturesClick={handleFeaturesClick}
+          currency={runtimePrefs.currency}
+        />
         <FeaturesSection sectionRef={featuresRef} />
         <HowItWorksSection sectionRef={howItWorksRef} />
         <StoresSection sectionRef={storesRef} onStoreOpen={handleStoreOpen} />
       </main>
+      <footer className="app-runtime-footer" aria-label="Runtime settings">
+        <div className="app-runtime-footer__inner">
+          {/* <p className="app-runtime-footer__label">Runtime Controls</p> */}
+          <div className="app-runtime-footer__groups">
+            <div className="app-runtime-toggle" role="group" aria-label="Currency mode">
+              <span className="app-runtime-toggle__title">Currency</span>
+              <div className="app-runtime-toggle__buttons">
+                <button
+                  type="button"
+                  className={`app-runtime-toggle__btn ${runtimePrefs.currency === 'USD' ? 'is-active' : ''}`}
+                  onClick={() => handleCurrencyToggle('USD')}
+                >
+                  USD
+                </button>
+                <button
+                  type="button"
+                  className={`app-runtime-toggle__btn ${runtimePrefs.currency === 'INR' ? 'is-active' : ''}`}
+                  onClick={() => handleCurrencyToggle('INR')}
+                >
+                  INR
+                </button>
+              </div>
+            </div>
+
+            <div className="app-runtime-toggle" role="group" aria-label="Backend cloud provider">
+              <span className="app-runtime-toggle__title">Cloud</span>
+              <div className="app-runtime-toggle__buttons">
+                <button
+                  type="button"
+                  className={`app-runtime-toggle__btn ${runtimePrefs.cloudProvider === 'AWS' ? 'is-active' : ''}`}
+                  onClick={() => handleCloudToggle('AWS')}
+                >
+                  AWS
+                </button>
+                <button
+                  type="button"
+                  className={`app-runtime-toggle__btn ${runtimePrefs.cloudProvider === 'AZURE' ? 'is-active' : ''}`}
+                  onClick={() => handleCloudToggle('AZURE')}
+                >
+                  Azure
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </footer>
     </div>
   )
 }
