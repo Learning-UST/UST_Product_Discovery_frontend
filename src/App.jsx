@@ -97,7 +97,7 @@ import HowItWorksSection from './components/sections/HowItWorksSection'
 import StoresSection from './components/sections/StoresSection'
 import { useSmoothScroll } from './hooks/useSmoothScroll'
 import { fetchLayoutById, fetchPlanogramStoreById } from './services/planogramStoresApi'
-import { getRuntimePreferences, setRuntimePreferences } from './services/api'
+import { getRuntimePreferences, setRuntimePreferences, setAgentProvider } from './services/api'
 import './App.css'
 
 const trimValue = (value) => (typeof value === 'string' ? value.trim() : '')
@@ -227,8 +227,22 @@ function App() {
     setRuntimePrefs((prev) => ({ ...prev, currency }))
   }
 
-  const handleCloudToggle = (cloudProvider) => {
-    setRuntimePrefs((prev) => ({ ...prev, cloudProvider }))
+  const handleCloudToggle = async (cloudProvider) => {
+    const normalizedCloudProvider = String(cloudProvider || '').toUpperCase() === 'AZURE' ? 'AZURE' : 'AWS'
+    const previousCloudProvider = runtimePrefs.cloudProvider
+
+    if (normalizedCloudProvider === previousCloudProvider) {
+      return
+    }
+
+    setRuntimePrefs((prev) => ({ ...prev, cloudProvider: normalizedCloudProvider }))
+
+    try {
+      await setAgentProvider(normalizedCloudProvider)
+    } catch (error) {
+      console.error('Failed to update backend cloud provider:', error)
+      setRuntimePrefs((prev) => ({ ...prev, cloudProvider: previousCloudProvider }))
+    }
   }
 
   // Loading state for QR scan redirection

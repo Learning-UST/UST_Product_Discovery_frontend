@@ -215,6 +215,32 @@ export const sendChatQuery = async (query, messages) => {
     return response.json();
 };
 
+export const setAgentProvider = async (cloudProvider) => {
+    const normalizedProvider = normalizeCloudProvider(cloudProvider);
+    const response = await runtimeFetch(`${FLASK_BASE_URL}/api/set-agent`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cloud_provider: normalizedProvider.toLowerCase() }),
+    });
+
+    let payload = null;
+    try {
+        payload = await response.json();
+    } catch {
+        // Response may be empty in some backend deployments.
+    }
+
+    if (!response.ok) {
+        const errorMessage = payload?.error || payload?.message || 'Failed to update agent provider';
+        throw new Error(errorMessage);
+    }
+
+    return payload || {
+        status: 'success',
+        cloud_provider: normalizedProvider.toLowerCase(),
+    };
+};
+
 export const getSpeechToken = async () => {
     const response = await runtimeFetch(`${FLASK_BASE_URL}/api/speech-to-text`, {
         method: 'POST',
