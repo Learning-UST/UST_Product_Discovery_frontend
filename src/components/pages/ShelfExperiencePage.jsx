@@ -210,6 +210,16 @@ const extractUpcFromSourceId = (value) => {
   return ''
 }
 
+const normalizeUpcValue = (value) => {
+  const raw = String(value || '').trim()
+  if (!raw) return ''
+
+  const fromSourceId = extractUpcFromSourceId(raw)
+  if (fromSourceId) return fromSourceId
+
+  return raw.replace(/^sku[_:\-\s]*/i, '').trim()
+}
+
 // function ProductCard({ product, expanded, onToggle }) {
 //   const brandLabel = getBrandLabel(product)
 //   const color = product.brand_color || getBrandColor(product.brand, product.name)
@@ -862,7 +872,22 @@ function ShelfExperiencePage({ store, layout, onBack, onQrShelfDetected, isQrLoa
     if (!payload || typeof payload !== 'object') return []
 
     const sources = [payload]
-    const nestedKeys = ['data', 'product', 'product_info', 'productInfo', 'details', 'detail', 'item', 'metadata']
+    const nestedKeys = [
+      'data',
+      'product',
+      'product_info',
+      'productInfo',
+      'details',
+      'detail',
+      'item',
+      'metadata',
+      'inventory',
+      'inventory_record',
+      'inventoryData',
+      'pricing',
+      'price_info',
+      'promotion',
+    ]
 
     for (const key of nestedKeys) {
       const nested = payload?.[key]
@@ -905,6 +930,22 @@ function ShelfExperiencePage({ store, layout, onBack, onQrShelfDetected, isQrLoa
     const resolvedName = readFirstValue(payload, ['name', 'Name', 'product_name', 'ProductName', 'productName'])
     if (!resolvedName && !fallbackValue) return null
 
+    const resolvedPrice = readFirstValue(payload, [
+      'final_price',
+      'Final_Price',
+      'discounted_price',
+      'discountedPrice',
+      'promo_price',
+      'promotion_price',
+      'selling_price',
+      'sale_price',
+      'effective_price',
+      'US_Price',
+      'us_price',
+      'Price',
+      'price',
+    ])
+
     return {
       ...payload,
       name: resolvedName || fallbackValue,
@@ -914,7 +955,7 @@ function ShelfExperiencePage({ store, layout, onBack, onQrShelfDetected, isQrLoa
       nutritional_facts: readFirstValue(payload, ['nutritional_facts', 'Nutritional_Facts', 'Nutritional Facts', 'nutrition_facts', 'nutrition', 'nutrition_data']),
       image_url: readFirstValue(payload, ['image_url', 'imageUrl', 'Image_URL', 'ImageUrl']),
       upc: readFirstValue(payload, ['upc', 'UPC']),
-      price: pickDisplayedPrice(payload),
+      price: resolvedPrice !== '' ? resolvedPrice : pickDisplayedPrice(payload),
       diet_type: readFirstValue(payload, ['diet_type', 'Diet_Type', 'Diet Type', 'Tags', 'tags']),
       ingredients: readFirstValue(payload, ['ingredients', 'Ingredients', 'Ingredient_List', 'ingredient_list', 'ingredient', 'Ingredients_List']),
       id: readFirstValue(payload, ['id', 'UPC', 'upc']) || fallbackValue,
@@ -1048,16 +1089,39 @@ function ShelfExperiencePage({ store, layout, onBack, onQrShelfDetected, isQrLoa
     const fetched = []
     const seen = new Set()
 
+    const simplifyNormalizedName = (value) =>
+      normalizeProductName(value)
+        .replace(/\b\d+(?:\.\d+)?\s*(ml|l|g|kg|oz|fl\s*oz)\b/g, '')
+        .replace(/\s+/g, ' ')
+        .trim()
+
     for (const name of names) {
       const normalized = normalizeProductName(name)
       if (!normalized || seen.has(normalized)) continue
       seen.add(normalized)
+      const simplified = simplifyNormalizedName(name)
 
       // First, try to match against shelf products by normalized name (fuzzy match)
       const shelfMatch = products.find((p) => normalizeProductName(p.name) === normalized)
       
       if (shelfMatch) {
         fetched.push(shelfMatch)
+        continue
+      }
+
+      const shelfRelaxedMatch = products.find((p) => {
+        const productNormalized = normalizeProductName(p.name)
+        const productSimplified = simplifyNormalizedName(p.name)
+        return (
+          (simplified && productSimplified && simplified === productSimplified) ||
+          (simplified && productNormalized && productNormalized.includes(simplified)) ||
+          (simplified && productSimplified && productSimplified.includes(simplified)) ||
+          (productNormalized && normalized.includes(productNormalized))
+        )
+      })
+
+      if (shelfRelaxedMatch) {
+        fetched.push(shelfRelaxedMatch)
         continue
       }
 
@@ -1160,6 +1224,67 @@ function ShelfExperiencePage({ store, layout, onBack, onQrShelfDetected, isQrLoa
         return unique
       }
 
+      const extractProductsListFromAnswer = (text) => {
+        if (!text) return []
+
+        const rawText = String(text)
+        const productsTokenRegex = /products\s*\(/gi
+        let lastToken = null
+        for (const token of rawText.matchAll(productsTokenRegex)) {
+          lastToken = token
+        }
+
+        if (!lastToken || typeof lastToken.index !== 'number') return []
+
+        const listStart = lastToken.index + lastToken[0].length
+        const listEnd = rawText.lastIndexOf(')')
+        if (listEnd <= listStart) return []
+
+        const parsed = rawText
+          .slice(listStart, listEnd)
+          .split(',')
+          .map((name) => String(name || '').trim())
+          .map((name) => name.replace(/^['"]|['"]$/g, '').trim())
+          .filter(Boolean)
+
+        const unique = []
+        const seen = new Set()
+        parsed.forEach((name) => {
+          const normalized = normalizeProductName(name)
+          if (!normalized || seen.has(normalized)) return
+          seen.add(normalized)
+          unique.push(name)
+        })
+
+        return unique
+      }
+
+      const isPlausibleProductName = (name) => {
+        if (!name || typeof name !== 'string') return false
+        const trimmed = String(name).trim()
+        const len = trimmed.length
+
+        // Reject if too short
+        if (len < 3) return false
+
+        // Reject if too long (likely a sentence/paragraph)
+        if (len > 150) return false
+
+        // Reject known metadata labels
+        const metadataLabels = /^\s*(price|description|origin|shelf life|diet type|ingredients|brand|category|upc|sku|id|quantity|stock|availability|details?|type|size|weight|nutrition|allergen|expiry|expiration|manufactured|best by|storage|instructions|warnings|tags|notes|comments?)\s*$/i
+        if (metadataLabels.test(trimmed)) return false
+
+        // Reject lines that are clearly part of explanation text
+        const explanationPatterns = /^(if |the |no |not |can |you |we |i |based|according|please|available|need|help|find|would|should|might)/i
+        if (explanationPatterns.test(trimmed)) return false
+
+        // Reject if it contains sentence-ending punctuation in the middle (likely multiple sentences)
+        const sentenceCount = (trimmed.match(/[.!?]\s+[A-Z]/g) || []).length
+        if (sentenceCount > 0) return false
+
+        return true
+      }
+
       const allKnownNames = [
         ...products.map((p) => p?.name || p?.product_name || p?.ProductName || ''),
         ...allStoreProducts.map((p) => p?.name || p?.product_name || p?.ProductName || p?.Name || ''),
@@ -1167,6 +1292,7 @@ function ShelfExperiencePage({ store, layout, onBack, onQrShelfDetected, isQrLoa
         .map((name) => String(name || '').trim())
         .filter(Boolean)
 
+      const answerListNames = extractProductsListFromAnswer(answerText)
       const answerLineNames = extractNamesFromTextList(answerText)
 
       const sourceTextValues = rawSources
@@ -1209,14 +1335,24 @@ function ShelfExperiencePage({ store, layout, onBack, onQrShelfDetected, isQrLoa
         }
       })
 
+      const responseProductUpcs = Array.isArray(res.product_upcs)
+        ? res.product_upcs
+            .map((upc) => normalizeUpcValue(upc))
+            .filter(Boolean)
+        : []
+
       const sourceUpcs = rawSources
         .map((d) => {
           if (typeof d === 'string') return ''
-          return extractUpcFromSourceId(
+          const explicitUpc = normalizeUpcValue(d?.upc || d?.product_upc || d?.UPC)
+          if (explicitUpc) return explicitUpc
+          return normalizeUpcValue(
             d?.id || d?.source_id || d?.doc_id || d?.sku || d?.SKU || d?.product_id || ''
           )
         })
         .filter(Boolean)
+
+      const fallbackUpcs = [...new Set(sourceUpcs)]
 
       const sourceNameValues = rawSources
         .map((d) => (typeof d === 'string' ? d : (d?.product || d?.name || d?.ProductName || d?.product_name || d?.title || d?.description || '')))
@@ -1244,29 +1380,57 @@ function ShelfExperiencePage({ store, layout, onBack, onQrShelfDetected, isQrLoa
         ? res.product_names.map((name) => String(name || '').trim()).filter(Boolean)
         : []
 
-      // Prefer backend-provided product_names from chat response.
+      const mergeUniqueProducts = (baseProducts, incomingProducts) => {
+        const merged = [...baseProducts]
+        const seen = new Set(
+          merged
+            .map((p) => normalizeProductName(p?.name || p?.product_name || p?.ProductName || p?.upc || p?.id || ''))
+            .filter(Boolean)
+        )
+
+        incomingProducts.forEach((p) => {
+          const key = normalizeProductName(p?.name || p?.product_name || p?.ProductName || p?.upc || p?.id || '')
+          if (!key || seen.has(key)) return
+          seen.add(key)
+          merged.push(p)
+        })
+
+        return merged
+      }
+
+      // Strict first pass: use explicit products(...) list from answer.
       let chatProds = []
-      if (responseProductNames.length > 0) {
-        chatProds = await fetchProductsByNames(responseProductNames)
-      } else {
-        if (sourceUpcs.length > 0) {
-          chatProds = await fetchProductsByUpcs(sourceUpcs)
+      if (answerListNames.length > 0) {
+        const validAnswerListNames = answerListNames.filter(isPlausibleProductName)
+        if (validAnswerListNames.length > 0) {
+          chatProds = await fetchProductsByNames(validAnswerListNames)
+        }
+      }
+
+      // Second pass: use backend-provided product_upcs.
+      if (responseProductUpcs.length > 0) {
+        const upcProducts = await fetchProductsByUpcs(responseProductUpcs)
+        chatProds = mergeUniqueProducts(chatProds, upcProducts)
+      }
+
+      // Fallback path: run existing source/name strategy only when first two passes have no results.
+      if (chatProds.length === 0) {
+        if (fallbackUpcs.length > 0) {
+          chatProds = await fetchProductsByUpcs(fallbackUpcs)
+        }
+
+        // Optional secondary enrich from explicit backend product names.
+        if (responseProductNames.length > 0) {
+          const nameProducts = await fetchProductsByNames(responseProductNames)
+          chatProds = mergeUniqueProducts(chatProds, nameProducts)
         }
 
         if (sourceNameValues.length > 0) {
-          const nameProducts = await fetchProductsByNames(sourceNameValues)
-          const seen = new Set(
-            chatProds
-              .map((p) => normalizeProductName(p?.name || p?.product_name || p?.ProductName || p?.id || ''))
-              .filter(Boolean)
-          )
-
-          nameProducts.forEach((p) => {
-            const key = normalizeProductName(p?.name || p?.product_name || p?.ProductName || p?.id || '')
-            if (!key || seen.has(key)) return
-            seen.add(key)
-            chatProds.push(p)
-          })
+          const validSourceNames = sourceNameValues.filter(isPlausibleProductName)
+          if (validSourceNames.length > 0) {
+            const nameProducts = await fetchProductsByNames(validSourceNames)
+            chatProds = mergeUniqueProducts(chatProds, nameProducts)
+          }
         }
 
         if (chatProds.length === 0 && rawSources.length > 0) {
@@ -1540,6 +1704,23 @@ function ShelfExperiencePage({ store, layout, onBack, onQrShelfDetected, isQrLoa
   // The API response wraps layout_data; preview_image is not returned by this endpoint.
   // We display the 3D planogram viewer via iframe and fall back to a placeholder.
 
+  const renderMarkdownBold = (line, lineIndex) => {
+    const text = String(line || '')
+    const parts = text.split(/(\*\*[^*]+\*\*)/g)
+
+    return parts.map((part, partIndex) => {
+      if (/^\*\*[^*]+\*\*$/.test(part)) {
+        return (
+          <strong key={`chat-bold-${lineIndex}-${partIndex}`}>
+            {part.slice(2, -2)}
+          </strong>
+        )
+      }
+
+      return <span key={`chat-text-${lineIndex}-${partIndex}`}>{part}</span>
+    })
+  }
+
   return (
     <div className="shelf-page">
       {/* ── Header ── */}
@@ -1804,7 +1985,7 @@ function ShelfExperiencePage({ store, layout, onBack, onQrShelfDetected, isQrLoa
               ) : (
                 msg.text.split('\n').map((line, i) => (
                   <span key={i}>
-                    {line}
+                    {renderMarkdownBold(line, i)}
                     {i < msg.text.split('\n').length - 1 && <br />}
                   </span>
                 ))

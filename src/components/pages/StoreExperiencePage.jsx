@@ -35,6 +35,37 @@ const extractShelfIdFromQrText = (rawValue) => {
   }
 }
 
+const resolveProductPrice = (product) => {
+  if (!product || typeof product !== 'object') {
+    return null
+  }
+
+  return (
+    product.final_price ??
+    product.Final_Price ??
+    product.discounted_price ??
+    product.discountedPrice ??
+    product.us_price ??
+    product.US_Price ??
+    product.Price ??
+    product.price ??
+    null
+  )
+}
+
+const formatPriceValue = (value) => {
+  if (value == null || value === '') {
+    return ''
+  }
+
+  const numeric = Number(value)
+  if (Number.isFinite(numeric)) {
+    return numeric.toFixed(2)
+  }
+
+  return String(value)
+}
+
 function StoreExperiencePage({ store, onChangeStore, onLayoutSelect }) {
   const [activeTab, setActiveTab] = useState('scan')
   const [cameraError, setCameraError] = useState('')
@@ -360,10 +391,12 @@ function StoreExperiencePage({ store, onChangeStore, onLayoutSelect }) {
   }, [searchTerm, allProducts])
 
   const formatProductDetails = (p) => {
+    const displayPrice = formatPriceValue(resolveProductPrice(p))
     const fields = [
       ['Name',              p.Name             || p.name],
       ['Brand',             p.Brand            || p.brand],
       ['Category',          p.Category         || p.category],
+      ['Price',             displayPrice],
       ['Description',       p.Description      || p.description],
       ['Nutritional Facts', p.Nutritional_Facts || p.nutritional_facts],
     ]

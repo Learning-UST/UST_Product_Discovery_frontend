@@ -150,17 +150,21 @@ export const fetchAllProductsFull = async () => {
 };
 
 export const fetchAllProducts = async () => {
-    const response = await runtimeFetch(`${FLASK_BASE_URL}/api/products?fields=name`);
+    const response = await runtimeFetch(`${FLASK_BASE_URL}/api/products`);
     const res = await response.json();
-    // Extract only name (+ id as key) regardless of backend field naming
+    // Normalize key product attributes for search + detail display.
     const list = Array.isArray(res) ? res : (Array.isArray(res?.data) ? res.data : []);
     const names = list.map((p) => ({
         id: p.id || p.UPC || p.upc || '',
+        upc: p.UPC || p.upc || p.id || '',
         name:              p.Name             || p.name             || '',
         brand:             p.Brand            || p.brand            || '',
         category:          p.Category         || p.category         || '',
         description:       p.Description      || p.description      || '',
         nutritional_facts: p.Nutritional_Facts || p.nutritional_facts || '',
+        price: p.final_price ?? p.Final_Price ?? p.discounted_price ?? p.discountedPrice ?? p.US_Price ?? p.us_price ?? p.Price ?? p.price ?? null,
+        final_price: p.final_price ?? p.Final_Price ?? null,
+        us_price: p.US_Price ?? p.us_price ?? null,
     })).filter((p) => p.name);
     return { status: 'success', data: names };
 };
