@@ -30,7 +30,16 @@ const extractShelfIdFromQrText = (rawValue) => {
   }
 }
 
-function Header({ onFeaturesClick, onStoresClick, onHowItWorksClick, onQrShelfDetected, isQrLoading = false }) {
+function Header({
+  onFeaturesClick,
+  onStoresClick,
+  onHowItWorksClick,
+  onQrShelfDetected,
+  isQrLoading = false,
+  isAuthenticated = false,
+  username = '',
+  onProfileClick,
+}) {
   const [scanOpen, setScanOpen] = useState(false)
   const [cameraError, setCameraError] = useState('')
   const [isCameraActive, setIsCameraActive] = useState(false)
@@ -211,6 +220,20 @@ function Header({ onFeaturesClick, onStoresClick, onHowItWorksClick, onQrShelfDe
           <Button variant="secondary" className="top-nav__cta">
             Shop now {'->'}
           </Button>
+
+          <button
+            type="button"
+            className="top-nav__profile-btn"
+            onClick={onProfileClick}
+            aria-label={isAuthenticated ? 'Open profile settings' : 'Sign in'}
+          >
+            <span className="top-nav__profile-avatar">
+              {(isAuthenticated ? (username || 'U') : 'L').slice(0, 1).toUpperCase()}
+            </span>
+            <span className="top-nav__profile-label">
+              {isAuthenticated ? (username || 'Profile') : 'Login'}
+            </span>
+          </button>
         </div>
       </header>
 

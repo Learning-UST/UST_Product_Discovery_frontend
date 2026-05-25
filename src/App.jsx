@@ -100,6 +100,12 @@ import { fetchLayoutById, fetchPlanogramStoreById } from './services/planogramSt
 import { getRuntimePreferences, setRuntimePreferences, setAgentProvider } from './services/api'
 import './App.css'
 
+const AUTH_STORAGE_KEY = 'shopilotAuthSession:v1'
+const DEFAULT_LOGIN_CREDENTIALS = {
+  username: 'ust',
+  password: '123456',
+}
+
 const trimValue = (value) => (typeof value === 'string' ? value.trim() : '')
 
 const extractShelfIdFromValue = (rawValue) => {
@@ -139,6 +145,183 @@ const resolveShelfIdFromLocation = (location) => {
   )
 }
 
+const getStoredAuthSession = () => {
+  if (typeof window === 'undefined') {
+    return { authenticated: false, username: '' }
+  }
+
+  try {
+    const raw = window.localStorage.getItem(AUTH_STORAGE_KEY)
+    if (!raw) {
+      return { authenticated: false, username: '' }
+    }
+
+    const parsed = JSON.parse(raw)
+    return {
+      authenticated: Boolean(parsed?.authenticated),
+      username: String(parsed?.username || ''),
+    }
+  } catch {
+    return { authenticated: false, username: '' }
+  }
+}
+
+const persistAuthSession = (session) => {
+  if (typeof window === 'undefined') {
+    return
+  }
+
+  try {
+    window.localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(session))
+  } catch {
+    // Ignore storage write failures.
+  }
+}
+
+const clearAuthSession = () => {
+  if (typeof window === 'undefined') {
+    return
+  }
+
+  try {
+    window.localStorage.removeItem(AUTH_STORAGE_KEY)
+  } catch {
+    // Ignore storage delete failures.
+  }
+}
+
+const clearShelfQueryFromUrl = () => {
+  if (typeof window === 'undefined') {
+    return
+  }
+
+  const params = new URLSearchParams(window.location.search)
+  params.delete('shelfId')
+  params.delete('layoutId')
+  params.delete('savedLayoutId')
+  params.delete('shelf')
+  const nextUrl = params.toString() ? `${window.location.pathname}?${params.toString()}` : window.location.pathname
+  window.history.replaceState({}, '', nextUrl)
+}
+
+function LoginPage({ onLogin, onCancel, error }) {
+  const [username, setUsername] = useState('')
+  const [password, setPassword] = useState('')
+
+  const handleSubmit = (event) => {
+    event.preventDefault()
+    onLogin({ username, password })
+  }
+
+  return (
+    <div className="app-login-shell">
+      <div className="app-login-card" role="dialog" aria-labelledby="app-login-title" aria-modal="true">
+        <p className="app-login-card__eyebrow">Protected Access</p>
+        <h1 id="app-login-title" className="app-login-card__title">Sign In to Continue</h1>
+        <p className="app-login-card__subtitle">Only authorized users can access shelf experience.</p>
+
+        <form className="app-login-card__form" onSubmit={handleSubmit}>
+          <label className="app-login-card__label" htmlFor="app-login-username">Username</label>
+          <input
+            id="app-login-username"
+            type="text"
+            className="app-login-card__input"
+            value={username}
+            onChange={(event) => setUsername(event.target.value)}
+            autoComplete="username"
+            required
+          />
+
+          <label className="app-login-card__label" htmlFor="app-login-password">Password</label>
+          <input
+            id="app-login-password"
+            type="password"
+            className="app-login-card__input"
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
+            autoComplete="current-password"
+            required
+          />
+
+          {error && <p className="app-login-card__error">{error}</p>}
+
+          <div className="app-login-card__actions">
+            <button type="button" className="app-login-card__btn app-login-card__btn--ghost" onClick={onCancel}>
+              Back
+            </button>
+            <button type="submit" className="app-login-card__btn app-login-card__btn--primary">
+              Login
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+function ProfilePage({ username, runtimePrefs, onCurrencyToggle, onCloudToggle, onBack, onLogout }) {
+  return (
+    <div className="app-profile-page">
+      <div className="app-profile-page__card">
+        <div className="app-profile-page__header">
+          <button type="button" className="app-profile-page__back" onClick={onBack}>
+            {'<-'} Back to home
+          </button>
+          <button type="button" className="app-profile-page__logout" onClick={onLogout}>
+            Logout
+          </button>
+        </div>
+
+        <p className="app-profile-page__eyebrow">Profile</p>
+        <h1 className="app-profile-page__title">Runtime Preferences</h1>
+        <p className="app-profile-page__subtitle">Signed in as {username}</p>
+
+        <div className="app-profile-page__groups">
+          <div className="app-runtime-toggle" role="group" aria-label="Currency mode">
+            <span className="app-runtime-toggle__title">Currency</span>
+            <div className="app-runtime-toggle__buttons">
+              <button
+                type="button"
+                className={`app-runtime-toggle__btn ${runtimePrefs.currency === 'USD' ? 'is-active' : ''}`}
+                onClick={() => onCurrencyToggle('USD')}
+              >
+                USD
+              </button>
+              <button
+                type="button"
+                className={`app-runtime-toggle__btn ${runtimePrefs.currency === 'INR' ? 'is-active' : ''}`}
+                onClick={() => onCurrencyToggle('INR')}
+              >
+                INR
+              </button>
+            </div>
+          </div>
+
+          <div className="app-runtime-toggle" role="group" aria-label="Backend cloud provider">
+            <span className="app-runtime-toggle__title">Cloud</span>
+            <div className="app-runtime-toggle__buttons">
+              <button
+                type="button"
+                className={`app-runtime-toggle__btn ${runtimePrefs.cloudProvider === 'AWS' ? 'is-active' : ''}`}
+                onClick={() => onCloudToggle('AWS')}
+              >
+                AWS
+              </button>
+              <button
+                type="button"
+                className={`app-runtime-toggle__btn ${runtimePrefs.cloudProvider === 'AZURE' ? 'is-active' : ''}`}
+                onClick={() => onCloudToggle('AZURE')}
+              >
+                Azure
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function App() {
   const featuresRef = useRef(null)
   const storesRef = useRef(null)
@@ -148,10 +331,31 @@ function App() {
   const [activeLayout, setActiveLayout] = useState(null)
   const [isAutoLoading, setIsAutoLoading] = useState(false)
   const [runtimePrefs, setRuntimePrefs] = useState(() => getRuntimePreferences())
+  const [activeView, setActiveView] = useState('home')
+  const [showLogin, setShowLogin] = useState(false)
+  const [authError, setAuthError] = useState('')
+  const [pendingShelfId, setPendingShelfId] = useState('')
+  const [pendingLayout, setPendingLayout] = useState(null)
+  const [pendingStore, setPendingStore] = useState(null)
+  const [pendingProfileOpen, setPendingProfileOpen] = useState(false)
+  const [authSession, setAuthSession] = useState(() => getStoredAuthSession())
 
   const { scrollToSection } = useSmoothScroll()
 
-  const loadShelfById = async (shelfId) => {
+  const isAuthenticated = authSession.authenticated
+
+  const loadShelfById = async (shelfId, options = {}) => {
+    const { skipAuthCheck = false } = options
+
+    if (!skipAuthCheck && !isAuthenticated) {
+      setPendingShelfId(String(shelfId || ''))
+      setPendingLayout(null)
+      setPendingStore(null)
+      setShowLogin(true)
+      setAuthError('')
+      return
+    }
+
     setIsAutoLoading(true)
 
     try {
@@ -212,15 +416,111 @@ function App() {
   const handleHowItWorksClick = () => scrollToSection(howItWorksRef)
 
   const handleStoreOpen = (store) => setActiveStore(store)
-  const handleLayoutSelect = (layout) => setActiveLayout(layout)
+  const handleLayoutSelect = (layout) => {
+    if (!isAuthenticated) {
+      setPendingStore(activeStore)
+      setPendingLayout(layout)
+      setPendingShelfId('')
+      setShowLogin(true)
+      setAuthError('')
+      return
+    }
+
+    setActiveLayout(layout)
+  }
   
   const handleChangeStore = () => {
     setActiveLayout(null)
     setActiveStore(null)
+    setActiveView('home')
   }
 
   const handleBackToStore = () => {
     setActiveLayout(null)
+  }
+
+  const handleLoginCancel = () => {
+    const hadShelfIntent = Boolean(pendingShelfId)
+
+    setShowLogin(false)
+    setAuthError('')
+    setPendingShelfId('')
+    setPendingLayout(null)
+    setPendingStore(null)
+    setPendingProfileOpen(false)
+
+    if (hadShelfIntent) {
+      clearShelfQueryFromUrl()
+    }
+  }
+
+  const handleLogin = async ({ username, password }) => {
+    const normalizedUsername = String(username || '').trim()
+    const normalizedPassword = String(password || '')
+
+    if (
+      normalizedUsername.toLowerCase() !== DEFAULT_LOGIN_CREDENTIALS.username.toLowerCase() ||
+      normalizedPassword !== DEFAULT_LOGIN_CREDENTIALS.password
+    ) {
+      setAuthError('Invalid credentials. Please try again.')
+      return
+    }
+
+    const nextSession = {
+      authenticated: true,
+      username: normalizedUsername || DEFAULT_LOGIN_CREDENTIALS.username,
+    }
+
+    setAuthSession(nextSession)
+    persistAuthSession(nextSession)
+    setShowLogin(false)
+    setAuthError('')
+
+    if (pendingShelfId) {
+      const targetShelfId = pendingShelfId
+      setPendingShelfId('')
+      setPendingLayout(null)
+      setPendingStore(null)
+      await loadShelfById(targetShelfId, { skipAuthCheck: true })
+      return
+    }
+
+    if (pendingStore && pendingLayout) {
+      setActiveStore(pendingStore)
+      setActiveLayout(pendingLayout)
+      setPendingStore(null)
+      setPendingLayout(null)
+      setPendingProfileOpen(false)
+      return
+    }
+
+    if (pendingProfileOpen) {
+      setActiveView('profile')
+      setPendingProfileOpen(false)
+    }
+  }
+
+  const handleLogout = () => {
+    clearAuthSession()
+    setAuthSession({ authenticated: false, username: '' })
+    setActiveView('home')
+    setActiveLayout(null)
+    setPendingShelfId('')
+    setPendingLayout(null)
+    setPendingStore(null)
+    setPendingProfileOpen(false)
+    clearShelfQueryFromUrl()
+  }
+
+  const handleOpenProfilePage = () => {
+    if (!isAuthenticated) {
+      setPendingProfileOpen(true)
+      setShowLogin(true)
+      setAuthError('')
+      return
+    }
+
+    setActiveView('profile')
   }
 
   const handleCurrencyToggle = (currency) => {
@@ -243,6 +543,10 @@ function App() {
       console.error('Failed to update backend cloud provider:', error)
       setRuntimePrefs((prev) => ({ ...prev, cloudProvider: previousCloudProvider }))
     }
+  }
+
+  if (showLogin) {
+    return <LoginPage onLogin={handleLogin} onCancel={handleLoginCancel} error={authError} />
   }
 
   // Loading state for QR scan redirection
@@ -277,6 +581,19 @@ function App() {
     )
   }
 
+  if (activeView === 'profile') {
+    return (
+      <ProfilePage
+        username={authSession.username || 'User'}
+        runtimePrefs={runtimePrefs}
+        onCurrencyToggle={handleCurrencyToggle}
+        onCloudToggle={handleCloudToggle}
+        onBack={() => setActiveView('home')}
+        onLogout={handleLogout}
+      />
+    )
+  }
+
   return (
     <div className="page-shell">
       <Header
@@ -285,6 +602,9 @@ function App() {
         onHowItWorksClick={handleHowItWorksClick}
         onQrShelfDetected={loadShelfById}
         isQrLoading={isAutoLoading}
+        isAuthenticated={isAuthenticated}
+        username={authSession.username}
+        onProfileClick={handleOpenProfilePage}
       />
       <main>
         <HeroSection
@@ -296,52 +616,6 @@ function App() {
         <HowItWorksSection sectionRef={howItWorksRef} />
         <StoresSection sectionRef={storesRef} onStoreOpen={handleStoreOpen} />
       </main>
-      <footer className="app-runtime-footer" aria-label="Runtime settings">
-        <div className="app-runtime-footer__inner">
-          {/* <p className="app-runtime-footer__label">Runtime Controls</p> */}
-          <div className="app-runtime-footer__groups">
-            <div className="app-runtime-toggle" role="group" aria-label="Currency mode">
-              <span className="app-runtime-toggle__title">Currency</span>
-              <div className="app-runtime-toggle__buttons">
-                <button
-                  type="button"
-                  className={`app-runtime-toggle__btn ${runtimePrefs.currency === 'USD' ? 'is-active' : ''}`}
-                  onClick={() => handleCurrencyToggle('USD')}
-                >
-                  USD
-                </button>
-                <button
-                  type="button"
-                  className={`app-runtime-toggle__btn ${runtimePrefs.currency === 'INR' ? 'is-active' : ''}`}
-                  onClick={() => handleCurrencyToggle('INR')}
-                >
-                  INR
-                </button>
-              </div>
-            </div>
-
-            <div className="app-runtime-toggle" role="group" aria-label="Backend cloud provider">
-              <span className="app-runtime-toggle__title">Cloud</span>
-              <div className="app-runtime-toggle__buttons">
-                <button
-                  type="button"
-                  className={`app-runtime-toggle__btn ${runtimePrefs.cloudProvider === 'AWS' ? 'is-active' : ''}`}
-                  onClick={() => handleCloudToggle('AWS')}
-                >
-                  AWS
-                </button>
-                <button
-                  type="button"
-                  className={`app-runtime-toggle__btn ${runtimePrefs.cloudProvider === 'AZURE' ? 'is-active' : ''}`}
-                  onClick={() => handleCloudToggle('AZURE')}
-                >
-                  Azure
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </footer>
     </div>
   )
 }

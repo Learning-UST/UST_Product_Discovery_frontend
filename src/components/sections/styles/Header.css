@@ -75,6 +75,51 @@
   flex-shrink: 0;
 }
 
+.top-nav__profile-btn {
+  border: 1px solid #c4d2c8;
+  border-radius: 999px;
+  background: #ffffff14;
+  color: #e8f0ea;
+  min-height: 2.7rem;
+  padding: 0.24rem 0.45rem 0.24rem 0.28rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.top-nav__profile-btn:hover {
+  background: #ffffff1f;
+  border-color: #d5e0d9;
+}
+
+.top-nav__profile-avatar {
+  width: 1.85rem;
+  height: 1.85rem;
+  border-radius: 50%;
+  background: #e8eee9;
+  color: #163628;
+  font-family: 'Manrope', sans-serif;
+  font-size: 0.74rem;
+  font-weight: 800;
+  display: grid;
+  place-items: center;
+}
+
+.top-nav__profile-label {
+  color: #f0f6f2;
+  font-family: 'Manrope', sans-serif;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  padding-right: 0.35rem;
+  max-width: 120px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .top-nav__scan-btn {
   appearance: none;
   -webkit-appearance: none;
@@ -256,6 +301,10 @@
 
   .top-nav__actions {
     gap: 0.45rem;
+  }
+
+  .top-nav__profile-label {
+    display: none;
   }
 
   .top-nav__scan-btn {

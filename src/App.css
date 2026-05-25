@@ -192,7 +192,277 @@ main { overflow: clip; }
   outline-offset: 1px;
 }
 
+.app-login-shell {
+  min-height: 100svh;
+  display: grid;
+  place-items: center;
+  padding: 1.2rem;
+  background:
+    radial-gradient(circle at 14% 12%, #f7be7240, transparent 30%),
+    radial-gradient(circle at 88% 82%, #0a5b3b2a, transparent 35%),
+    linear-gradient(140deg, #03150d 0%, #154b2f 45%, #2f5b30 100%);
+}
+
+.app-login-card {
+  width: min(450px, 100%);
+  background: #fbfbf9;
+  border: 1px solid #d6ddd6;
+  border-radius: 1.1rem;
+  box-shadow: 0 24px 44px #00000026;
+  padding: 1.4rem 1.4rem 1.2rem;
+}
+
+.app-login-card__eyebrow {
+  margin: 0;
+  color: #4a6157;
+  font-family: 'Manrope', sans-serif;
+  font-size: 0.8rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 700;
+}
+
+.app-login-card__title {
+  margin: 0.45rem 0 0;
+  font-family: 'Fraunces', serif;
+  font-size: clamp(1.6rem, 1.3rem + 1vw, 2rem);
+}
+
+.app-login-card__subtitle {
+  margin: 0.45rem 0 1.1rem;
+  color: #4f6258;
+  font-family: 'Manrope', sans-serif;
+  font-size: 0.96rem;
+}
+
+.app-login-card__form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.48rem;
+}
+
+.app-login-card__label {
+  font-family: 'Manrope', sans-serif;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #304339;
+}
+
+.app-login-card__input {
+  border: 1px solid #c9d4cc;
+  border-radius: 0.7rem;
+  padding: 0.7rem 0.8rem;
+  font-family: 'Manrope', sans-serif;
+  font-size: 0.95rem;
+}
+
+.app-login-card__input:focus-visible {
+  outline: 2px solid #0d553760;
+  outline-offset: 1px;
+}
+
+.app-login-card__error {
+  margin: 0.15rem 0 0;
+  color: #b33a2c;
+  font-family: 'Manrope', sans-serif;
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.app-login-card__actions {
+  margin-top: 0.7rem;
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.55rem;
+}
+
+.app-login-card__btn {
+  border: 0;
+  border-radius: 999px;
+  padding: 0.55rem 1rem;
+  cursor: pointer;
+  font-family: 'Manrope', sans-serif;
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
+.app-login-card__btn--ghost {
+  background: #e9eeea;
+  color: #2d4137;
+}
+
+.app-login-card__btn--primary {
+  background: #0d5537;
+  color: #fff;
+}
+
+.app-profile-page {
+  min-height: 100svh;
+  display: grid;
+  place-items: center;
+  padding: 1.2rem;
+  background:
+    radial-gradient(circle at 20% 14%, #f7be7233, transparent 30%),
+    radial-gradient(circle at 80% 86%, #0a5b3b24, transparent 36%),
+    linear-gradient(145deg, #05190f 0%, #1c4e34 50%, #2e5c31 100%);
+}
+
+.app-profile-page__card {
+  width: min(560px, 100%);
+  background: #fbfbf9;
+  border: 1px solid #d3dad3;
+  border-radius: 1rem;
+  padding: 1.2rem;
+  box-shadow: 0 22px 40px #00000022;
+}
+
+.app-profile-page__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.app-profile-page__back,
+.app-profile-page__logout {
+  border: 0;
+  border-radius: 999px;
+  padding: 0.48rem 0.86rem;
+  cursor: pointer;
+  font-family: 'Manrope', sans-serif;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.app-profile-page__back {
+  background: #e7ece8;
+  color: #2d4539;
+}
+
+.app-profile-page__logout {
+  background: #f3dfda;
+  color: #7f2e22;
+}
+
+.app-profile-page__eyebrow {
+  margin: 0.9rem 0 0;
+  color: #456256;
+  font-family: 'Manrope', sans-serif;
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 800;
+}
+
+.app-profile-page__title {
+  margin: 0.36rem 0 0;
+  font-family: 'Fraunces', serif;
+  font-size: clamp(1.6rem, 1.35rem + 0.9vw, 2.1rem);
+}
+
+.app-profile-page__subtitle {
+  margin: 0.45rem 0 1rem;
+  color: #50645b;
+  font-family: 'Manrope', sans-serif;
+  font-size: 0.92rem;
+}
+
+.app-profile-page__groups {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.app-profile {
+  position: fixed;
+  top: 0.9rem;
+  right: 1rem;
+  z-index: 50;
+}
+
+.app-profile__trigger {
+  border: 1px solid #c7d2ca;
+  border-radius: 999px;
+  background: #ffffffee;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  padding: 0.28rem 0.42rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  cursor: pointer;
+}
+
+.app-profile__avatar {
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: #0d5537;
+  color: #fff;
+  font-family: 'Manrope', sans-serif;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.app-profile__name {
+  color: #294438;
+  font-family: 'Manrope', sans-serif;
+  font-size: 0.86rem;
+  font-weight: 700;
+  padding-right: 0.35rem;
+}
+
+.app-profile__panel {
+  margin-top: 0.55rem;
+  min-width: 272px;
+  border: 1px solid #d3dbd4;
+  border-radius: 0.9rem;
+  background: #ffffff;
+  box-shadow: 0 18px 34px #0a16111f;
+  padding: 0.72rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.app-profile__panel-title {
+  margin: 0.15rem 0 0.3rem;
+  color: #325246;
+  font-family: 'Manrope', sans-serif;
+  font-size: 0.79rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.app-profile__logout {
+  margin-top: 0.25rem;
+  border: 0;
+  border-radius: 0.65rem;
+  padding: 0.56rem 0.65rem;
+  cursor: pointer;
+  background: #f3dfda;
+  color: #7f2e22;
+  font-family: 'Manrope', sans-serif;
+  font-size: 0.84rem;
+  font-weight: 800;
+}
+
 @media (width <= 720px) {
+  .app-profile {
+    top: 0.7rem;
+    right: 0.7rem;
+  }
+
+  .app-profile__name {
+    display: none;
+  }
+
+  .app-profile__panel {
+    min-width: min(86vw, 300px);
+  }
+
   .app-runtime-footer__inner {
     width: calc(100% - 1.2rem);
     align-items: flex-start;

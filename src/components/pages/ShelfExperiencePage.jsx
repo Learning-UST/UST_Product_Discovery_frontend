@@ -634,83 +634,109 @@ function ShelfExperiencePage({ store, layout, onBack, onQrShelfDetected, isQrLoa
         // Get all products listed in this shelf from the layout plan (authoritative list)
         const layoutProducts = parseProducts(layoutData)
 
-        // Fetch full product details from Cosmos
-        const allCosmosProducts = await fetchAllProductsFull()
-
-        // Normalize name for fuzzy matching: lowercase, strip ALL punctuation
         const normalizeName = (s) => (s || '').toLowerCase().replace(/[^a-z0-9\s()]/g, '').replace(/\s+/g, ' ').trim()
 
-        // Build lookup map: normalized name → cosmos product
-        const cosmosMap = {}
-        for (const p of allCosmosProducts) {
-          const key = normalizeName(p.Name || p.name)
-          if (key) cosmosMap[key] = p
-        }
-
-        // Fetch configured price from direct endpoint using UPC and map it by UPC
-        const uniqueUpcs = [...new Set(
-          layoutProducts
-            .map((lp) => {
-              const key = normalizeName(lp.name)
-              const cp = cosmosMap[key]
-              return cp ? (cp.UPC || cp.upc || lp.upc || '') : (lp.upc || '')
-            })
-            .filter(Boolean)
-            .map((u) => String(u))
-        )]
-        const priceMap = {}
-        await Promise.all(uniqueUpcs.map(async (upc) => {
-          try {
-            const res = await fetchDirectProductDetails(upc)
-            const payload = res?.data ?? res
-            const discountedPrice =
-              pickDisplayedPrice(payload)
-              ?? pickDisplayedPrice(payload?.inventory)
-              ?? pickDisplayedPrice(payload?.inventory_record)
-              ?? pickDisplayedPrice(payload?.inventoryData)
-            if (discountedPrice != null && discountedPrice !== '') priceMap[upc] = discountedPrice
-          } catch {
-            // Keep graceful fallback to bulk price when direct endpoint fails for an item.
-          }
+        const buildInitialShelfProducts = () => layoutProducts.map((lp) => ({
+          id: lp.id || lp.name,
+          name: lp.name,
+          layoutName: lp.name,
+          brand: lp.brand || '',
+          category: lp.category || '',
+          description: lp.description || '',
+          nutritional_facts: lp.nutritional_facts || '',
+          upc: lp.upc || '',
+          image_url: lp.imageUrl || lp.image_url || '',
+          price: USE_US_PRICE ? (lp.US_Price ?? lp.us_price ?? lp.usprice ?? lp.price ?? null) : (lp.price ?? null),
+          diet_type: lp.diet_type || '',
+          ingredients: lp.ingredients || '',
+          stock_count: lp.stock_count,
         }))
 
-        // For every product in the shelf, use Cosmos data if name matches, else fallback to layout data
-        const shelfProducts = layoutProducts.map((lp) => {
-          const key = normalizeName(lp.name)
-          const cp = cosmosMap[key]
-          const resolvedUpc = cp ? (cp.UPC || cp.upc || lp.upc || '') : (lp.upc || '')
-          return {
-            id:               cp ? (cp.id || cp.UPC || cp.upc || lp.id || lp.name) : (lp.id || lp.name),
-            name:             cp ? (cp.Name || cp.name || lp.name) : lp.name,
-            layoutName:       lp.name,
-            brand:            cp ? (cp.Brand || cp.brand || lp.brand) : lp.brand,
-            category:         cp ? (cp.Category || cp.category || lp.category) : lp.category,
-            description:      cp ? (cp.Description || cp.description || '') : '',
-            nutritional_facts:cp ? (cp.Nutritional_Facts || cp.nutritional_facts || '') : '',
-            upc:              cp ? (cp.UPC || cp.upc || lp.upc) : lp.upc,
-            image_url:        cp ? (cp.image_url || cp.imageUrl || '') : '',
-            price:            priceMap[String(resolvedUpc)]
-              ?? (cp
-                ? (USE_US_PRICE
-                    ? (cp.US_Price ?? cp.us_price ?? cp.usprice ?? cp.Price ?? cp.price ?? lp.US_Price ?? lp.us_price ?? lp.usprice ?? lp.price ?? null)
-                    : (cp.Price ?? cp.price ?? lp.price ?? null)
-                  )
-                : (USE_US_PRICE
-                    ? (lp.US_Price ?? lp.us_price ?? lp.usprice ?? lp.price ?? null)
-                    : (lp.price ?? null)
-                  )
-              ),
-            diet_type:        cp ? (cp.Diet_Type || cp.diet_type || cp.Tags || cp.tags || '') : '',
-            ingredients:      cp ? (cp.Ingredients || cp.ingredients || '') : '',
-            stock_count:      lp.stock_count,
-          }
-        })
+        if (!cancelled) {
+          setProducts(buildInitialShelfProducts())
+          setLoading(false)
+        }
 
-        if (!cancelled) setProducts(shelfProducts)
+        void (async () => {
+          try {
+            // Fetch full product details in the background.
+            const allCosmosProducts = await fetchAllProductsFull()
+            if (cancelled) return
+
+            // Build lookup map: normalized name → cosmos product
+            const cosmosMap = {}
+            for (const p of allCosmosProducts) {
+              const key = normalizeName(p.Name || p.name)
+              if (key) cosmosMap[key] = p
+            }
+
+            const uniqueUpcs = [...new Set(
+              layoutProducts
+                .map((lp) => {
+                  const key = normalizeName(lp.name)
+                  const cp = cosmosMap[key]
+                  return cp ? (cp.UPC || cp.upc || lp.upc || '') : (lp.upc || '')
+                })
+                .filter(Boolean)
+                .map((u) => String(u))
+            )]
+
+            const priceMap = {}
+            await Promise.allSettled(uniqueUpcs.map(async (upc) => {
+              try {
+                const res = await fetchDirectProductDetails(upc)
+                const payload = res?.data ?? res
+                const discountedPrice =
+                  pickDisplayedPrice(payload)
+                  ?? pickDisplayedPrice(payload?.inventory)
+                  ?? pickDisplayedPrice(payload?.inventory_record)
+                  ?? pickDisplayedPrice(payload?.inventoryData)
+                if (discountedPrice != null && discountedPrice !== '') priceMap[upc] = discountedPrice
+              } catch {
+                // Keep graceful fallback to bulk price when direct endpoint fails for an item.
+              }
+            }))
+
+            const enrichedShelfProducts = layoutProducts.map((lp) => {
+              const key = normalizeName(lp.name)
+              const cp = cosmosMap[key]
+              const resolvedUpc = cp ? (cp.UPC || cp.upc || lp.upc || '') : (lp.upc || '')
+              return {
+                id:               cp ? (cp.id || cp.UPC || cp.upc || lp.id || lp.name) : (lp.id || lp.name),
+                name:             cp ? (cp.Name || cp.name || lp.name) : lp.name,
+                layoutName:       lp.name,
+                brand:            cp ? (cp.Brand || cp.brand || lp.brand) : lp.brand,
+                category:         cp ? (cp.Category || cp.category || lp.category) : lp.category,
+                description:      cp ? (cp.Description || cp.description || '') : '',
+                nutritional_facts:cp ? (cp.Nutritional_Facts || cp.nutritional_facts || '') : '',
+                upc:              cp ? (cp.UPC || cp.upc || lp.upc) : lp.upc,
+                image_url:        cp ? (cp.image_url || cp.imageUrl || '') : '',
+                price:            priceMap[String(resolvedUpc)]
+                  ?? (cp
+                    ? (USE_US_PRICE
+                        ? (cp.US_Price ?? cp.us_price ?? cp.usprice ?? cp.Price ?? cp.price ?? lp.US_Price ?? lp.us_price ?? lp.usprice ?? lp.price ?? null)
+                        : (cp.Price ?? cp.price ?? lp.price ?? null)
+                      )
+                    : (USE_US_PRICE
+                        ? (lp.US_Price ?? lp.us_price ?? lp.usprice ?? lp.price ?? null)
+                        : (lp.price ?? null)
+                      )
+                  ),
+                diet_type:        cp ? (cp.Diet_Type || cp.diet_type || cp.Tags || cp.tags || '') : '',
+                ingredients:      cp ? (cp.Ingredients || cp.ingredients || '') : '',
+                stock_count:      lp.stock_count,
+              }
+            })
+
+            if (!cancelled) setProducts(enrichedShelfProducts)
+          } catch {
+            // Keep the initial fast render if background enrichment fails.
+          }
+        })()
       } catch {
         if (!cancelled) setError('Failed to load shelf data from planogram.')
       } finally {
-        if (!cancelled) setLoading(false)
+        // loading is cleared after the first fast render; background enrich runs separately
       }
     }
 
@@ -1180,15 +1206,25 @@ function ShelfExperiencePage({ store, layout, onBack, onQrShelfDetected, isQrLoa
     try {
       const messages = buildMessagesFromHistory(chatHistory)
       const res = await sendChatQuery(scopedQuery, messages)
+      const answerText = res.answer || ''
+
+      const stripProductsLineFromAnswer = (text) => {
+        const lines = String(text || '')
+          .split('\n')
+          .filter((line) => !/^\s*products\s*\(/i.test(line.trim()))
+
+        return lines.join('\n').trim()
+      }
+
+      const displayAnswerText = stripProductsLineFromAnswer(answerText)
       setChatHistory((prev) => [
         ...prev.slice(0, -1), // Remove 'Thinking...'
-        { role: 'ai', text: res.answer || JSON.stringify(res) }
+        { role: 'ai', text: displayAnswerText || JSON.stringify(res) }
       ])
       const sourcePayload = res.sources ?? res.docs
       const rawSources = Array.isArray(sourcePayload)
         ? sourcePayload
         : (Array.isArray(sourcePayload?.results) ? sourcePayload.results : [])
-      const answerText = res.answer || ''
 
       const extractNamesFromTextList = (text) => {
         if (!text) return []
