@@ -1,4 +1,6 @@
+
 import Button from '../ui/Button'
+import { Link } from 'react-router-dom';
 
 function HeroSection({ onStoresClick, onFeaturesClick, currency = 'USD' }) {
   const isInrMode = String(currency || '').toUpperCase() === 'INR'
@@ -20,6 +22,9 @@ function HeroSection({ onStoresClick, onFeaturesClick, currency = 'USD' }) {
           <Button variant="primary" onClick={onStoresClick}>
             Choose a store {'->'}
           </Button>
+          <Link to="/food" style={{ textDecoration: 'none', marginLeft: 8 }}>
+            <Button variant="secondary">Food Chat</Button>
+          </Link>
           <Button variant="ghost" onClick={onFeaturesClick}>
             See how it works
           </Button>

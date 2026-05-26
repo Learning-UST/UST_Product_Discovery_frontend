@@ -16,6 +16,7 @@
     "microsoft-cognitiveservices-speech-sdk": "^1.49.0",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
+    "react-router-dom": "^6.30.3",
     "three": "^0.184.0"
   },
   "devDependencies": {

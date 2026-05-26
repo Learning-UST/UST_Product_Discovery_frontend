@@ -194,6 +194,7 @@ function Header({
           </button>
         </nav>
 
+
         <div className="top-nav__actions">
           <button
             type="button"
@@ -216,6 +217,31 @@ function Header({
               <path d="M14 14h2v2h-2zM18 14h3M14 18v3M18 18h3v3h-3z" strokeLinecap="round" />
             </svg>
           </button>
+
+
+          {/* Food Chat navigation button with auth check, styled like Shop now */}
+          <Button
+            variant="secondary"
+            className="top-nav__cta"
+            style={{ marginRight: 8 }}
+            onClick={() => {
+              try {
+                const raw = window.localStorage.getItem('shopilotAuthSession:v1');
+                const auth = raw ? JSON.parse(raw) : { authenticated: false };
+                if (auth.authenticated) {
+                  window.location.href = '/food';
+                } else {
+                  if (typeof window !== 'undefined' && typeof window.__showFoodChatLogin === 'function') {
+                    window.__showFoodChatLogin();
+                  }
+                }
+              } catch {
+                // fallback: do nothing
+              }
+            }}
+          >
+            Food Chat
+          </Button>
 
           <Button variant="secondary" className="top-nav__cta">
             Shop now {'->'}

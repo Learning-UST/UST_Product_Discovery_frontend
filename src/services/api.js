@@ -11,6 +11,16 @@ const DEFAULT_RUNTIME_PREFS = {
     cloudProvider: 'AWS',
 };
 
+// Food chat endpoint
+export const sendFoodChatQuery = async (query, messages) => {
+    const safeMessages = Array.isArray(messages) ? messages : [];
+    const response = await runtimeFetch(`${FLASK_BASE_URL}/api/chat-food`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query, messages: safeMessages })
+    });
+    return response.json();
+};
 const normalizeCurrency = (value) => {
     const normalized = String(value || '').toUpperCase();
     return normalized === 'INR' ? 'INR' : 'USD';
