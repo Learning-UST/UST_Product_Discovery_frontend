@@ -522,6 +522,7 @@ function ShelfExperiencePage({ store, layout, onBack, onQrShelfDetected, isQrLoa
   const [products, setProducts] = useState([])
   const [shelfMeta, setShelfMeta] = useState({ aisleNumber: '1', shelfCode: '' })
   const [loading, setLoading] = useState(true)
+  const [isProductsEnriching, setIsProductsEnriching] = useState(false)
   const [error, setError] = useState('')
   const [searchTerm, setSearchTerm] = useState('')
   // WhatsApp-style chat history: array of {role: 'user'|'ai', text: string}
@@ -622,6 +623,7 @@ function ShelfExperiencePage({ store, layout, onBack, onQrShelfDetected, isQrLoa
 
     const load = async () => {
       setLoading(true)
+      setIsProductsEnriching(false)
       setError('')
       try {
         // API returns { layout_data, chat_history, sessionId, status }
@@ -655,6 +657,7 @@ function ShelfExperiencePage({ store, layout, onBack, onQrShelfDetected, isQrLoa
         if (!cancelled) {
           setProducts(buildInitialShelfProducts())
           setLoading(false)
+          setIsProductsEnriching(true)
         }
 
         void (async () => {
@@ -731,10 +734,17 @@ function ShelfExperiencePage({ store, layout, onBack, onQrShelfDetected, isQrLoa
             if (!cancelled) setProducts(enrichedShelfProducts)
           } catch {
             // Keep the initial fast render if background enrichment fails.
+          } finally {
+            if (!cancelled) {
+              setIsProductsEnriching(false)
+            }
           }
         })()
       } catch {
-        if (!cancelled) setError('Failed to load shelf data from planogram.')
+        if (!cancelled) {
+          setError('Failed to load shelf data from planogram.')
+          setIsProductsEnriching(false)
+        }
       } finally {
         // loading is cleared after the first fast render; background enrich runs separately
       }
@@ -1495,7 +1505,67 @@ function ShelfExperiencePage({ store, layout, onBack, onQrShelfDetected, isQrLoa
         }
       }
 
-      setChatProducts(chatProds)
+      const hasUsableUpc = (value) => /^\d{8,18}$/.test(String(value || '').trim())
+
+      const resolveUpcForChatProduct = async (product) => {
+        const directUpc = normalizeUpcValue(product?.upc || product?.UPC || '')
+        if (hasUsableUpc(directUpc)) {
+          return directUpc
+        }
+
+        const productName = String(product?.name || product?.product_name || product?.ProductName || '').trim()
+        const normalizedName = normalizeProductName(productName)
+        if (!normalizedName) {
+          return ''
+        }
+
+        const shelfMatch = products.find((item) =>
+          normalizeProductName(item?.name || item?.product_name || item?.ProductName || '') === normalizedName
+        )
+        const shelfUpc = normalizeUpcValue(shelfMatch?.upc || shelfMatch?.UPC || '')
+        if (hasUsableUpc(shelfUpc)) {
+          return shelfUpc
+        }
+
+        const storeMatch = allStoreProducts.find((item) =>
+          normalizeProductName(item?.name || item?.product_name || item?.ProductName || item?.Name || '') === normalizedName
+        )
+        const storeUpc = normalizeUpcValue(storeMatch?.upc || storeMatch?.UPC || '')
+        if (hasUsableUpc(storeUpc)) {
+          return storeUpc
+        }
+
+        try {
+          const result = await fetchProductById(productName)
+          const raw = result?.data ?? result
+          const payload = Array.isArray(raw) ? raw[0] : raw
+          const mapped = mapFetchedPayloadToProduct(payload, productName)
+          const resolvedFromLookup = normalizeUpcValue(mapped?.upc || mapped?.UPC || '')
+          if (hasUsableUpc(resolvedFromLookup)) {
+            return resolvedFromLookup
+          }
+        } catch {
+          // Ignore lookup failures and let final filter drop this product.
+        }
+
+        return ''
+      }
+
+      const chatProductsWithValidUpc = (await Promise.all(
+        chatProds.map(async (product) => {
+          const resolvedUpc = await resolveUpcForChatProduct(product)
+          if (!hasUsableUpc(resolvedUpc)) {
+            return null
+          }
+
+          return {
+            ...product,
+            upc: resolvedUpc,
+          }
+        })
+      )).filter(Boolean)
+
+      setChatProducts(chatProductsWithValidUpc)
     } catch (err) {
       setChatHistory((prev) => [
         ...prev.slice(0, -1),
@@ -2058,6 +2128,16 @@ function ShelfExperiencePage({ store, layout, onBack, onQrShelfDetected, isQrLoa
         })()}
 
         {loading && <p className="shelf-page__status">Loading shelf data…</p>}
+        {!loading && !error && isProductsEnriching && (
+          <p className="shelf-page__status shelf-page__status--with-loader" aria-live="polite">
+            <span className="shelf-page__inline-loader" aria-hidden="true">
+              <span className="shelf-page__inline-loader-dot" />
+              <span className="shelf-page__inline-loader-dot" />
+              <span className="shelf-page__inline-loader-dot" />
+            </span>
+            <span>Loading product prices and details…</span>
+          </p>
+        )}
         {error && <p className="shelf-page__error">{error}</p>}
 
         {!loading && !error && displayedProducts.length === 0 && (
