@@ -458,6 +458,7 @@ function App() {
     const normalizedUsername = String(username || '').trim()
     const normalizedPassword = String(password || '')
 
+
     if (
       normalizedUsername.toLowerCase() !== DEFAULT_LOGIN_CREDENTIALS.username.toLowerCase() ||
       normalizedPassword !== DEFAULT_LOGIN_CREDENTIALS.password
@@ -475,6 +476,13 @@ function App() {
     persistAuthSession(nextSession)
     setShowLogin(false)
     setAuthError('')
+
+    // If user was trying to access Food Chat, go there after login
+    if (window.localStorage.getItem('shopilotPendingFoodChat')) {
+      window.localStorage.removeItem('shopilotPendingFoodChat');
+      window.location.href = '/food';
+      return;
+    }
 
     if (pendingShelfId) {
       const targetShelfId = pendingShelfId
@@ -494,6 +502,7 @@ function App() {
       return
     }
 
+    // Only go to profile if user explicitly requested it
     if (pendingProfileOpen) {
       setActiveView('profile')
       setPendingProfileOpen(false)
@@ -592,6 +601,18 @@ function App() {
         onLogout={handleLogout}
       />
     )
+  }
+
+  // Expose a global callback for Header to trigger login modal for Food Chat
+  if (typeof window !== 'undefined') {
+    window.__showFoodChatLogin = () => {
+      setShowLogin(true);
+      setAuthError('');
+      setPendingShelfId('');
+      setPendingLayout(null);
+      setPendingStore(null);
+      setPendingProfileOpen(false);
+    };
   }
 
   return (

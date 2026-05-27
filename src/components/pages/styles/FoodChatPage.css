@@ -1,0 +1,676 @@
+/* Desktop/laptop scroll area for chat - reinforce flex and min-height */
+.food-chat-card {
+  display: flex;
+  flex-direction: column;
+  height: 75vh;
+  max-height: 90vh;
+  min-height: 400px;
+  overflow: hidden;
+}
+.food-chat-messages {
+  flex: 1 1 0%;
+  min-height: 0;
+  overflow-y: auto;
+  background: #f7f7f5;
+  scrollbar-width: thin;
+  scrollbar-color: #b6e7c9 #f7f7f5;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+.food-chat-messages::-webkit-scrollbar {
+  width: 8px;
+  background: #f7f7f5;
+}
+.food-chat-messages::-webkit-scrollbar-thumb {
+  background: #b6e7c9;
+  border-radius: 8px;
+}
+.food-chat-messages::-webkit-scrollbar-track {
+  background: #f7f7f5;
+  border-radius: 8px;
+}
+/* Desktop/laptop scroll area for chat */
+.food-chat-messages {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: 100%;
+  height: 100%;
+  overflow-y: scroll;
+  padding: 1.2rem;
+  font-size: 0.97rem;
+  background: #f7f7f5;
+  scrollbar-width: thin;
+  scrollbar-color: #b6e7c9 #f7f7f5;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  display: block;
+}
+.food-chat-messages::-webkit-scrollbar {
+  width: 8px;
+  background: #f7f7f5;
+  display: block;
+}
+.food-chat-messages::-webkit-scrollbar-thumb {
+  background: #b6e7c9;
+  border-radius: 8px;
+  display: block;
+}
+.food-chat-messages::-webkit-scrollbar-track {
+  background: #f7f7f5;
+  border-radius: 8px;
+  display: block;
+}
+@media (max-width: 600px) {
+  html, body, #root {
+    height: 100vh !important;
+    min-height: 100vh !important;
+    max-height: 100vh !important;
+    overflow: hidden !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+  .food-chat-fullscreen {
+    height: 100vh !important;
+    min-height: 100vh !important;
+    max-height: 100vh !important;
+    overflow: hidden !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+  }
+  .food-chat-card {
+    width: 100vw !important;
+    max-width: 100vw !important;
+    min-width: 0 !important;
+    height: 100vh !important;
+    max-height: 100vh !important;
+    margin: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    display: flex !important;
+    flex-direction: column !important;
+  }
+  .food-chat-messages {
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    max-height: 100% !important;
+    height: 100% !important;
+    overflow-y: scroll !important;
+    padding: 12px 4px 8px 4px !important;
+    font-size: 0.97rem;
+    background: #f7f7f5 !important;
+    scrollbar-width: thin !important;
+    scrollbar-color: #b6e7c9 #f7f7f5 !important;
+    overscroll-behavior: contain !important;
+    -webkit-overflow-scrolling: touch !important;
+    display: block !important;
+  }
+  .food-chat-messages::-webkit-scrollbar {
+    width: 8px !important;
+    background: #f7f7f5 !important;
+    display: block !important;
+  }
+  .food-chat-messages::-webkit-scrollbar-thumb {
+    background: #b6e7c9 !important;
+    border-radius: 8px !important;
+    display: block !important;
+  }
+  .food-chat-messages::-webkit-scrollbar-track {
+    background: #f7f7f5 !important;
+    border-radius: 8px !important;
+    display: block !important;
+  }
+  .food-chat-bubble {
+    max-width: 95vw !important;
+    padding: 10px 10px !important;
+    font-size: 0.97rem !important;
+  }
+  .food-chat-input-area {
+    padding: 8px 4px !important;
+    border-radius: 0 !important;
+    position: relative !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    width: 100vw !important;
+    max-width: 100vw !important;
+    box-sizing: border-box !important;
+    z-index: 10 !important;
+    display: flex !important;
+    flex-direction: row !important;
+    gap: 4px !important;
+  }
+  .food-chat-input-area button, .food-chat-input-area input {
+    font-size: 1rem !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+  }
+  .shelf-page__header {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    padding: 1rem 0.5rem 1rem 0.5rem !important;
+    gap: 0.5rem !important;
+    position: relative !important;
+    min-width: 0 !important;
+    width: 100vw !important;
+    max-width: 100vw !important;
+    box-sizing: border-box !important;
+    z-index: 20 !important;
+  }
+  .shelf-page__header > div {
+    flex-direction: column !important;
+    align-items: center !important;
+    gap: 0.5rem !important;
+    width: 100% !important;
+  }
+  .food-chat-ust-logo {
+    width: 32px !important;
+    height: 32px !important;
+    min-width: 32px !important;
+    min-height: 32px !important;
+    max-width: 32px !important;
+    max-height: 32px !important;
+  }
+  .shelf-page__chat-card {
+    border-radius: 0 !important;
+  }
+  .shelf-page__back {
+    width: 100%;
+    margin: 0.5rem 0 0 0 !important;
+    box-sizing: border-box !important;
+    font-size: 1rem !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    display: block !important;
+    z-index: 21 !important;
+  }
+  .food-chat-input-area .Button {
+    flex: 0 0 auto !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    font-size: 1rem !important;
+    padding: 0 12px !important;
+    margin: 0 !important;
+    z-index: 11 !important;
+  }
+}
+@media (max-width: 600px) {
+  html, body, #root {
+    height: 100vh !important;
+    min-height: 100vh !important;
+    max-height: 100vh !important;
+    overflow: hidden !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+  .food-chat-fullscreen {
+    height: 100vh !important;
+    min-height: 100vh !important;
+    max-height: 100vh !important;
+    overflow: hidden !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+  }
+  .food-chat-card {
+    width: 100vw !important;
+    max-width: 100vw !important;
+    min-width: 0 !important;
+    height: 100vh !important;
+    max-height: 100vh !important;
+    margin: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    display: flex !important;
+    flex-direction: column !important;
+  }
+  .food-chat-messages {
+    flex: 1 1 auto !important;
+    height: 100% !important;
+    max-height: 100% !important;
+    min-height: 0 !important;
+    overflow-y: auto !important;
+    padding: 12px 4px 8px 4px !important;
+    font-size: 0.97rem;
+    background: #f7f7f5 !important;
+    scrollbar-width: thin !important;
+    scrollbar-color: #b6e7c9 #f7f7f5 !important;
+  }
+  .food-chat-messages::-webkit-scrollbar {
+    width: 8px !important;
+  }
+  .food-chat-messages::-webkit-scrollbar-thumb {
+    background: #b6e7c9 !important;
+    border-radius: 8px !important;
+  }
+  .food-chat-messages::-webkit-scrollbar-track {
+    background: #f7f7f5 !important;
+    border-radius: 8px !important;
+  }
+  .food-chat-bubble {
+    max-width: 95vw !important;
+    padding: 10px 10px !important;
+    font-size: 0.97rem !important;
+  }
+  .food-chat-input-area {
+    padding: 8px 4px !important;
+    border-radius: 0 !important;
+    position: relative !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    width: 100vw !important;
+    max-width: 100vw !important;
+    box-sizing: border-box !important;
+    z-index: 10 !important;
+    display: flex !important;
+    flex-direction: row !important;
+    gap: 4px !important;
+  }
+  .food-chat-input-area button, .food-chat-input-area input {
+    font-size: 1rem !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+  }
+  .shelf-page__header {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    padding: 1rem 0.5rem 1rem 0.5rem !important;
+    gap: 0.5rem !important;
+    position: relative !important;
+    min-width: 0 !important;
+    width: 100vw !important;
+    max-width: 100vw !important;
+    box-sizing: border-box !important;
+    z-index: 20 !important;
+  }
+  .shelf-page__header > div {
+    flex-direction: column !important;
+    align-items: center !important;
+    gap: 0.5rem !important;
+    width: 100% !important;
+  }
+  .food-chat-ust-logo {
+    width: 32px !important;
+    height: 32px !important;
+    min-width: 32px !important;
+    min-height: 32px !important;
+    max-width: 32px !important;
+    max-height: 32px !important;
+  }
+  .shelf-page__chat-card {
+    border-radius: 0 !important;
+  }
+  .shelf-page__back {
+    width: 100%;
+    margin: 0.5rem 0 0 0 !important;
+    box-sizing: border-box !important;
+    font-size: 1rem !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    display: block !important;
+    z-index: 21 !important;
+  }
+  .food-chat-input-area .Button {
+    flex: 0 0 auto !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    font-size: 1rem !important;
+    padding: 0 12px !important;
+    margin: 0 !important;
+    z-index: 11 !important;
+  }
+}
+@media (max-width: 600px) {
+  .food-chat-fullscreen {
+    min-width: 100vw;
+    padding: 0;
+  }
+  .food-chat-card {
+    width: 100vw !important;
+    max-width: 100vw !important;
+    min-width: 0 !important;
+    height: 100vh !important;
+    max-height: 100vh !important;
+    margin: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+  }
+  .food-chat-messages {
+    padding: 12px 4px 8px 4px !important;
+    font-size: 0.97rem;
+  }
+  .food-chat-bubble {
+    max-width: 95vw !important;
+    padding: 10px 10px !important;
+    font-size: 0.97rem !important;
+  }
+  .food-chat-input-area {
+    padding: 8px 4px !important;
+    border-radius: 0 !important;
+  }
+  .shelf-page__header {
+    flex-direction: column !important;
+    align-items: center !important;
+    padding: 1rem 0.5rem 1rem 0.5rem !important;
+    gap: 0.5rem !important;
+  }
+  .food-chat-ust-logo {
+    width: 32px !important;
+    height: 32px !important;
+    min-width: 32px !important;
+    min-height: 32px !important;
+    max-width: 32px !important;
+    max-height: 32px !important;
+  }
+  .shelf-page__chat-card {
+    border-radius: 0 !important;
+  }
+}
+.food-chat-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+/* Animated rotating border for loading state */
+/* Snake-like animated border for loading state */
+.food-chat-card--loading {
+  border: 3px solid transparent !important;
+  background-clip: padding-box;
+  position: relative;
+}
+.food-chat-card--loading::after {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: 20px;
+  z-index: 2;
+  pointer-events: none;
+  border: 3px solid transparent;
+  background: none;
+  background-image:
+    linear-gradient(90deg, #21c97a 0 0),
+    linear-gradient(90deg, #b6e7c9 0 0);
+  background-size: 40% 3px, 40% 3px;
+  background-repeat: no-repeat;
+  background-position: left top, right bottom;
+  animation: snake-border-move 1.2s linear infinite;
+}
+
+@keyframes snake-border-move {
+  0% {
+    background-position: left top, right bottom;
+  }
+  50% {
+    background-position: right top, left bottom;
+  }
+  100% {
+    background-position: left top, right bottom;
+  }
+}
+.food-chat-loader {
+  min-width: 48px;
+  min-height: 32px;
+  display: flex;
+  align-items: center;
+  background: #f0f4ff;
+  color: #222;
+  font-size: 1.1rem;
+  border-radius: 16px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.03);
+}
+
+.food-chat-typing {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.food-chat-typing .dot {
+  width: 8px;
+  height: 8px;
+  background: #ffb347;
+  border-radius: 50%;
+  display: inline-block;
+  animation: chat-typing-bounce 1.2s infinite both;
+}
+.food-chat-typing .dot:nth-child(2) {
+  animation-delay: 0.2s;
+}
+.food-chat-typing .dot:nth-child(3) {
+  animation-delay: 0.4s;
+}
+@keyframes chat-typing-bounce {
+  0%, 80%, 100% { transform: scale(0.8); opacity: 0.7; }
+  40% { transform: scale(1.2); opacity: 1; }
+}
+
+.food-chat-fullscreen {
+  min-height: 100vh;
+  min-width: 100vw;
+  background: var(--background-primary, #f7f8fa);
+  display: flex;
+  flex-direction: column;
+}
+
+.food-chat-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 24px 0 0 0;
+  width: 100%;
+  max-width: var(--section-width, 1200px);
+  margin: 0 auto;
+}
+
+.food-chat-messages {
+  flex: 1 1 auto;
+  height: 0;
+  min-height: 0;
+  max-height: 100%;
+  overflow-y: auto;
+  padding: 24px 16px 12px 16px;
+  background: transparent;
+  width: 100%;
+  scrollbar-width: thin;
+  scrollbar-color: #b6e7c9 #f7f7f5;
+}
+
+.food-chat-messages::-webkit-scrollbar {
+  width: 8px;
+}
+.food-chat-messages::-webkit-scrollbar-thumb {
+  background: #b6e7c9;
+  border-radius: 8px;
+}
+.food-chat-messages::-webkit-scrollbar-track {
+  background: #f7f7f5;
+  border-radius: 8px;
+}
+
+.food-chat-message {
+  display: flex;
+  margin-bottom: 16px;
+}
+.food-chat-message.user {
+  justify-content: flex-end;
+}
+.food-chat-message.assistant {
+  justify-content: flex-start;
+}
+.food-chat-bubble {
+  max-width: 75%;
+  padding: 12px 16px;
+  border-radius: 16px;
+  background: var(--background-secondary, #f0f4ff);
+  color: var(--text-primary, #222);
+  font-size: 1rem;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.03);
+  position: relative;
+}
+.food-chat-message.user .food-chat-bubble {
+  background: #ffe7b2;
+  color: #333;
+  border-bottom-right-radius: 4px;
+}
+.food-chat-message.assistant .food-chat-bubble {
+  background: #e6f7e6;
+  color: #1a3a1a;
+  border-bottom-left-radius: 4px;
+}
+.food-chat-sources, .food-chat-recipes {
+  margin-top: 8px;
+  font-size: 0.92em;
+  color: #666;
+}
+.food-chat-sources ul {
+  margin: 4px 0 0 16px;
+  padding: 0;
+}
+.food-chat-input-area {
+  display: flex;
+  border-top: 1px solid #e6ece8;
+  padding: 12px 0 12px 0;
+  background: #fff;
+  width: 100%;
+  margin: 0;
+  position: sticky;
+  bottom: 0;
+  left: 0;
+  z-index: 2;
+  border-bottom-left-radius: 18px;
+  border-bottom-right-radius: 18px;
+}
+.food-chat-input-area input {
+  flex: 1;
+  padding: 10px 14px;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  font-size: 1rem;
+  outline: none;
+  margin-right: 8px;
+  transition: border 0.2s;
+}
+.food-chat-input-area input:focus {
+  border: 1.5px solid #ffb347;
+}
+.food-chat-input-area button {
+  background: linear-gradient(90deg, #ffb347 0%, #ffcc33 100%);
+  color: #333;
+  border: none;
+  border-radius: 8px;
+  padding: 0 22px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 40px;
+}
+.food-chat-input-area button:disabled {
+  background: #f5e9c6;
+  color: #aaa;
+  cursor: not-allowed;
+}
+.food-chat-mic-btn {
+  background: #fffbe6;
+  color: #ffb347;
+  border: 1.5px solid #ffcc33;
+  border-radius: 8px;
+  padding: 0 12px;
+  font-size: 1.3rem;
+  margin-right: 8px;
+  transition: background 0.2s, border 0.2s;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.food-chat-mic-btn.listening {
+  background: #ffe7b2;
+  border-color: #ffb347;
+  color: #d35400;
+}
+.food-chat-header {
+  background: linear-gradient(90deg, #ffb347 0%, #ffcc33 100%);
+  color: #333;
+  font-size: 1.3rem;
+  font-weight: 700;
+  padding: 18px 24px;
+  text-align: center;
+  border-bottom: 1px solid #f5e9c6;
+  letter-spacing: 0.01em;
+}
+
+.food-chat-card {
+  width: 80vw;
+  height: 75vh;
+  max-width: 900px;
+  max-height: 90vh;
+  background: #fff;
+  border-radius: 18px;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.10);
+  display: flex;
+  flex-direction: column;
+  margin: 2.5vh auto;
+  overflow: hidden;
+  position: relative;
+}
+
+@media (max-width: 900px) {
+  .food-chat-card {
+    width: 98vw;
+    height: 90vh;
+    max-width: 99vw;
+    max-height: 99vh;
+    border-radius: 0;
+  }
+}
+
+.food-chat-header {
+  display: flex;
+  align-items: center;
+  gap: 1.1rem;
+  background: linear-gradient(90deg, #ffb347 0%, #ffcc33 100%);
+  color: #333;
+  font-size: 1.3rem;
+  font-weight: 700;
+  padding: 18px 24px;
+  text-align: left;
+  border-bottom: 1px solid #f5e9c6;
+  letter-spacing: 0.01em;
+  min-height: 64px;
+}
+.food-chat-ust-logo {
+  height: 38px;
+  width: auto;
+  border-radius: 6px;
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+}
+.food-chat-home-btn {
+  margin-left: auto;
+  background: #fffbe6;
+  color: #ffb347;
+  border: 1.5px solid #ffcc33;
+  border-radius: 8px;
+  padding: 6px 18px;
+  font-size: 1rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background 0.2s, border 0.2s;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.food-chat-home-btn:hover {
+  background: #ffe7b2;
+  border-color: #ffb347;
+  color: #d35400;
+}
