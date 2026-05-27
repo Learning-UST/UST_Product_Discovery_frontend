@@ -14,7 +14,22 @@
 }
 
 .page-shell { background: var(--surface); color: var(--text-primary); }
-main { overflow: clip; }
+main {
+  overflow: visible;
+}
+
+html,
+body,
+#root {
+  width: 100%;
+  min-height: 100%;
+  height: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
+  position: static;
+  touch-action: pan-y;
+  -webkit-overflow-scrolling: touch;
+}
 
 .top-nav { width: var(--section-width); z-index: 20; backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); justify-content: space-between; align-items: center; gap: 1.5rem; min-height: 80px; margin: 0 auto; display: flex; position: sticky; top: 0; }
 .brand { color: var(--text-primary); z-index: 2; align-items: center; gap: 0.7rem; text-decoration: none; display: inline-flex; position: relative; }

@@ -14,6 +14,29 @@ body {
   background: #f4f4f1;
 }
 
+html, body {
+  width: 100%;
+  min-height: 100vh;
+  height: 100vh;
+  overflow-x: hidden;
+  overflow-y: auto !important;
+  overscroll-behavior-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
 #root {
-  min-height: 100svh;
+  width: 100%;
+  min-height: 100vh;
+  height: 100vh;
+  overflow: visible;
+}
+
+html,
+body {
+  width: 100%;
+  height: auto;
+  min-height: 100%;
+  overflow-x: hidden;
+  overflow-y: auto !important;
+  overscroll-behavior-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
