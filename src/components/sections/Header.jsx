@@ -243,7 +243,7 @@ function Header({
             Food Chat
           </Button>
 
-          <Button variant="secondary" className="top-nav__cta">
+          <Button variant="secondary" className="top-nav__cta top-nav__shop-now">
             Shop now {'->'}
           </Button>
 

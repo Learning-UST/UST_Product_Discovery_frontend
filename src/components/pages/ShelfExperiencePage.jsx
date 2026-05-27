@@ -1834,43 +1834,44 @@ function ShelfExperiencePage({ store, layout, onBack, onQrShelfDetected, isQrLoa
         <button type="button" className="shelf-page__back" onClick={onBack}>
           &#8592; Back to store
         </button>
-        <button
-          type="button"
-          className="shelf-page__scan-corner-btn"
-          aria-label="Scan shelf"
-          onClick={() => {
-            const opening = !scanOpen
-            setScanOpen(opening)
-            setCameraError('')
-            setQrMessage('')
-            setQrScanned(false)
-            if (opening) startCamera()
-            else stopCamera()
-          }}
-        >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
-            <rect x="3" y="3" width="7" height="7" rx="1" />
-            <rect x="14" y="3" width="7" height="7" rx="1" />
-            <rect x="3" y="14" width="7" height="7" rx="1" />
-            <path d="M14 14h2v2h-2zM18 14h3M14 18v3M18 18h3v3h-3z" strokeLinecap="round" />
-          </svg>
-        </button>
+        <div className="shelf-page__header-actions">
+          <button
+            type="button"
+            className="shelf-page__scan-corner-btn shelf-page__share-corner-btn"
+            aria-label="Share shelf link"
+            onClick={handleShareLink}
+            title="Share shelf link"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+              <circle cx="18" cy="5" r="2.5" />
+              <circle cx="6" cy="12" r="2.5" />
+              <circle cx="18" cy="19" r="2.5" />
+              <path d="M8.3 11l7.4-4.1M8.3 13l7.4 4.1" strokeLinecap="round" />
+            </svg>
+          </button>
+          <button
+            type="button"
+            className="shelf-page__scan-corner-btn"
+            aria-label="Scan shelf"
+            onClick={() => {
+              const opening = !scanOpen
+              setScanOpen(opening)
+              setCameraError('')
+              setQrMessage('')
+              setQrScanned(false)
+              if (opening) startCamera()
+              else stopCamera()
+            }}
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+              <rect x="3" y="3" width="7" height="7" rx="1" />
+              <rect x="14" y="3" width="7" height="7" rx="1" />
+              <rect x="3" y="14" width="7" height="7" rx="1" />
+              <path d="M14 14h2v2h-2zM18 14h3M14 18v3M18 18h3v3h-3z" strokeLinecap="round" />
+            </svg>
+          </button>
+        </div>
         <p className="shelf-page__eyebrow">AISLE {shelfMeta.aisleNumber}</p>
-
-        <button
-          type="button"
-          className="shelf-page__scan-corner-btn shelf-page__share-corner-btn"
-          aria-label="Share shelf link"
-          onClick={handleShareLink}
-          title="Share shelf link"
-        >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
-            <circle cx="18" cy="5" r="2.5" />
-            <circle cx="6" cy="12" r="2.5" />
-            <circle cx="18" cy="19" r="2.5" />
-            <path d="M8.3 11l7.4-4.1M8.3 13l7.4 4.1" strokeLinecap="round" />
-          </svg>
-        </button>
       </header>
 
       {/* ── Scan modal ── */}

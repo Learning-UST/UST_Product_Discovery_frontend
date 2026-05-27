@@ -100,13 +100,21 @@
 }
 .store-page__option-name {
   flex: 1;
+  min-width: 0;
   font-size: 0.92rem;
   color: #1a2e24;
   font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .store-page__option-brand {
   font-size: 0.78rem;
   color: #7a9b8a;
+  flex-shrink: 0;
+  max-width: 35%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .store-page__option-check {
   color: #0a3f2b;
@@ -480,5 +488,54 @@
 
   .store-page__scan-btn {
     font-size: 1.05rem;
+  }
+}
+
+@media (width <= 520px) {
+  .store-page__hero {
+    padding-inline: 0.85rem;
+  }
+
+  .store-page__change-store {
+    max-width: 100%;
+    white-space: normal;
+    text-align: left;
+  }
+
+  .store-page__content {
+    width: calc(100% - 0.9rem);
+  }
+
+  .store-page__tabs {
+    border-radius: 0.9rem;
+    grid-template-columns: 1fr;
+  }
+
+  .store-page__tab {
+    border-radius: 0.7rem;
+    padding: 0.72rem 0.9rem;
+  }
+
+  .store-page__panel {
+    border-radius: 1rem;
+    padding: 0.9rem;
+  }
+
+  .store-page__select-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .store-page__go-btn {
+    width: 100%;
+  }
+
+  .store-page__search-option {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .store-page__option-brand {
+    max-width: 100%;
   }
 }

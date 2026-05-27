@@ -21,7 +21,6 @@ function getStoredAuthSession() {
 import { useState, useRef, useEffect } from 'react';
 
 import { Link } from 'react-router-dom';
-import '../../styles/layout.css';
 import './styles/FoodChatPage.css';
 import Button from '../ui/Button';
 import { sendFoodChatQuery } from '../../services/api';
@@ -100,20 +99,20 @@ const FoodChatPage = () => {
   return (
     <div className="food-chat-fullscreen shelf-page" style={{ background: '#f4f4f1' }}>
       {/* Full-width header styled like shelf-page__header */}
-      <header className="shelf-page__header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.5rem clamp(1rem, 2vw, 2.5rem) 1.5rem', background: 'linear-gradient(110deg, #02160f 0%, #0a3f2b 48%, #2d6937 100%)', color: '#f4f7f5', width: '100%', position: 'relative' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1.1rem', justifyContent: 'center' }}>
+      <header className="shelf-page__header food-chat-page__header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.5rem clamp(1rem, 2vw, 2.5rem) 1.5rem', background: 'linear-gradient(110deg, #02160f 0%, #0a3f2b 48%, #2d6937 100%)', color: '#f4f7f5', width: '100%', position: 'relative' }}>
+        <div className="food-chat-page__brand" style={{ display: 'flex', alignItems: 'center', gap: '1.1rem', justifyContent: 'center' }}>
           <div style={{ background: '#fff', borderRadius: 8, padding: 0, width: 42, height: 42, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
             <img src="https://brand.ust.com/etc.clientlibs/global/clientlibs/clientlib-base/resources/images/logo-main.svg" alt="UST Logo" className="food-chat-ust-logo" style={{ width: 34, height: 34, objectFit: 'contain', display: 'block' }} />
           </div>
-          <span style={{ fontSize: '1.35rem', fontWeight: 700, letterSpacing: '0.01em', color: '#f4f7f5' }}>AI Food Assistant</span>
+          <span className="food-chat-page__title" style={{ fontSize: '1.35rem', fontWeight: 700, letterSpacing: '0.01em', color: '#f4f7f5' }}>AI Food Assistant</span>
         </div>
-        <div style={{ position: 'absolute', right: '2.5rem', top: '50%', transform: 'translateY(-50%)', display: 'flex', alignItems: 'center', gap: '0.7rem' }}>
+        <div className="food-chat-page__nav" style={{ position: 'absolute', right: '2.5rem', top: '50%', transform: 'translateY(-50%)', display: 'flex', alignItems: 'center', gap: '0.7rem' }}>
           <Link to="/" style={{ textDecoration: 'none' }}>
             <Button variant="secondary" className="shelf-page__back" style={{ background: '#d7dfd9', color: '#25302b', border: 0, fontSize: '1rem', fontWeight: 600, padding: '0.6rem 1.1rem' }}>Home</Button>
           </Link>
         </div>
       </header>
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'flex-start', gap: 24, width: '100%' }}>
+      <div className="food-chat-page__stage" style={{ display: 'flex', justifyContent: 'center', alignItems: 'flex-start', gap: 24, width: '100%' }}>
         <div className={`food-chat-card shelf-page__chat-card${loading ? ' food-chat-card--loading' : ''}`} style={{
           background: '#fff',
           borderRadius: 18,

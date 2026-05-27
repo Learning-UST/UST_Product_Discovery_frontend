@@ -1,11 +1,12 @@
 /* ── Page shell ── */
 .shelf-page {
   min-height: 100dvh;
+  height: auto;
   background: #f4f4f1;
   display: flex;
   flex-direction: column;
-  height: 100dvh;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: visible;
 }
 
 
@@ -156,11 +157,18 @@
     linear-gradient(110deg, #02160f 0%, #0a3f2b 48%, #2d6937 100%);
 }
 
-/* Small square scan button in the top-right of the header */
-.shelf-page__scan-corner-btn {
+.shelf-page__header-actions {
   position: absolute;
   top: 1.1rem;
   right: 1.1rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* Small square scan button in the top-right of the header */
+.shelf-page__scan-corner-btn {
+  position: static;
   width: 2.6rem;
   height: 2.6rem;
   display: flex;
@@ -184,7 +192,7 @@
 
 /* Place share button to the left of scanner button in the header */
 .shelf-page__share-corner-btn {
-  right: 4.2rem;
+  right: auto;
 }
 
 /* Scan modal overlay */
@@ -413,9 +421,9 @@
   margin: 0 auto;
   padding: 1.8rem 0 5rem;
   flex: 1 1 auto;
-  overflow-y: auto;
+  overflow: visible;
   -webkit-overflow-scrolling: touch;
-  min-height: 0;
+  min-height: auto;
 }
 
 .shelf-page__chips {
@@ -1174,6 +1182,41 @@
 
 /* ── Responsive ── */
 @media (width <= 640px) {
+  .shelf-page__header {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 0.8rem;
+    padding: 0.9rem 0.85rem 1.35rem;
+  }
+
+  .shelf-page__header-actions {
+    position: static;
+    justify-self: end;
+    gap: 0.45rem;
+  }
+
+  .shelf-page__back {
+    min-width: 0;
+    width: auto;
+    max-width: 100%;
+    justify-self: start;
+    padding: 0.55rem 0.85rem;
+    font-size: 0.9rem;
+    white-space: nowrap;
+  }
+
+  .shelf-page__scan-corner-btn {
+    width: 2.45rem;
+    height: 2.45rem;
+    flex: 0 0 2.45rem;
+  }
+
+  .shelf-page__eyebrow {
+    grid-column: 1 / -1;
+    margin-top: 0.25rem;
+  }
+
   .shelf-page__chip-remove {
     width: 2rem;
     height: 2rem;
@@ -1637,24 +1680,35 @@
   flex-shrink: 0;
 }
 
-/* ── Mobile scroll fix ── */
-html,
-body {
-  width: 100%;
-  overflow-x: hidden;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-}
-
 @media (width <= 640px) {
   .shelf-page {
     min-height: 100dvh;
-    overflow-y: auto;
+    height: auto;
+    overflow-y: visible;
     overflow-x: hidden;
     -webkit-overflow-scrolling: touch;
   }
 
   .shelf-page__body {
+    width: calc(100% - 0.9rem);
     overflow: visible;
+  }
+}
+
+@media (width <= 380px) {
+  .shelf-page__header {
+    gap: 0.55rem;
+    padding-inline: 0.65rem;
+  }
+
+  .shelf-page__back {
+    padding-inline: 0.65rem;
+    font-size: 0.84rem;
+  }
+
+  .shelf-page__scan-corner-btn {
+    width: 2.25rem;
+    height: 2.25rem;
+    flex-basis: 2.25rem;
   }
 }
