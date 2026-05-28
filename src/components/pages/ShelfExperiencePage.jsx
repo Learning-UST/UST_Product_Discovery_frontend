@@ -598,7 +598,9 @@ function ShelfExperiencePage({ store, layout, onBack, onQrShelfDetected, isQrLoa
     const repeatedHighlights = viewerHighlightedProducts
       .map((name) => `&highlightProducts=${encodeURIComponent(name)}`)
       .join('')
-    return `${repeatedHighlights}&maskOthers=true&maskColor=%23111111&maskOpacity=0.72`
+    // return `${repeatedHighlights}&dimOthers=true`
+    return `${repeatedHighlights}&maskOthers=true&maskColor=%23ffffff&maskOpacity=0.60`
+    
   }, [viewerHighlightedProducts])
 
   const handleShareLink = async () => {
@@ -1835,20 +1837,7 @@ function ShelfExperiencePage({ store, layout, onBack, onQrShelfDetected, isQrLoa
           &#8592; Back to store
         </button>
         <div className="shelf-page__header-actions">
-          <button
-            type="button"
-            className="shelf-page__scan-corner-btn shelf-page__share-corner-btn"
-            aria-label="Share shelf link"
-            onClick={handleShareLink}
-            title="Share shelf link"
-          >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
-              <circle cx="18" cy="5" r="2.5" />
-              <circle cx="6" cy="12" r="2.5" />
-              <circle cx="18" cy="19" r="2.5" />
-              <path d="M8.3 11l7.4-4.1M8.3 13l7.4 4.1" strokeLinecap="round" />
-            </svg>
-          </button>
+          <p className="shelf-page__eyebrow" style={{margin: 0}}>{`AISLE ${shelfMeta.aisleNumber}`}</p>
           <button
             type="button"
             className="shelf-page__scan-corner-btn"
@@ -1871,7 +1860,6 @@ function ShelfExperiencePage({ store, layout, onBack, onQrShelfDetected, isQrLoa
             </svg>
           </button>
         </div>
-        <p className="shelf-page__eyebrow">AISLE {shelfMeta.aisleNumber}</p>
       </header>
 
       {/* ── Scan modal ── */}
