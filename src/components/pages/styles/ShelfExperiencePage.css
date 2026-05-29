@@ -631,7 +631,7 @@
 .shelf-page__search-btn:hover {
   background: #f0f3f0;
 }
-
+/* 
 .shelf-page__ask-btn {
   flex-shrink: 0;
   border: none;
@@ -646,6 +646,57 @@
   white-space: nowrap;
   box-shadow: 0 2px 8px #0d553730;
   transition: background 0.15s;
+} */
+
+
+/* ── Send / Ask AI Button (Icon Version) ── */
+.shelf-page__ask-btn {
+  flex-shrink: 0;
+  border: none;
+  border-radius: 50%; /* Changes it from a pill to a perfect circle */
+  width: 3rem;
+  height: 3rem;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  background: linear-gradient(135deg, #0d5537 0%, #117a50 100%);
+  cursor: pointer;
+  box-shadow: 0 8px 16px #0d55373d;
+  transition: background 0.15s, transform 0.15s, box-shadow 0.15s;
+}
+
+.shelf-page__ask-btn svg {
+  width: 1.3rem;
+  height: 1.3rem;
+  transition: transform 0.2s ease;
+}
+
+.shelf-page__ask-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #0a442c 0%, #0f6d46 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 10px 18px #0d55374a;
+}
+
+/* Optional: Add a subtle upward animation to the arrow when hovering */
+.shelf-page__ask-btn:hover:not(:disabled) svg {
+  transform: translateY(-2px);
+}
+
+.shelf-page__ask-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* Override the old mobile padding */
+@media (width <= 640px) {
+  .shelf-page__ask-btn {
+    width: 2.6rem;
+    height: 2.6rem;
+    min-height: auto;
+    padding: 0;
+  }
 }
 
 .shelf-page__ask-btn:hover {
