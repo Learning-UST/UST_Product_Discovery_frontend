@@ -390,6 +390,7 @@
 
 /* ── Planogram viewer ── */
 .shelf-page__viewer-wrap {
+  position: relative;
   width: min(1200px, 98vw);
   margin: -0.5rem auto 0 auto;
   border-radius: 1rem;
@@ -1360,7 +1361,7 @@
     max-height: none;
   }
 
-  .shelf-page__viewer-iframe {
+  /* .shelf-page__viewer-iframe {
     width: 100% !important;
     height: 100% !important;
     min-height: 0;
@@ -1368,6 +1369,15 @@
     margin: 0;
     transform: translateY(5%) scale(2.35);
     transform-origin: center center;
+  } */
+
+  .shelf-page__viewer-iframe {
+    width: 100% !important;
+    height: 100% !important;
+    min-height: 0;
+    max-height: none;
+    margin: 0;
+    transform: none; /* Removed the scale(2.35) */
   }
 
   .shelf-product {
@@ -2103,4 +2113,113 @@
 .shelf-page__results-panel {
   max-height: none !important;
   padding-bottom: 5rem !important; /* Prevents the FAB from overlapping the last product */
+}
+
+/* ── Pinned Products Tray (Overlay on Canvas) ── */
+.shelf-page__pinned-tray {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  gap: 0.8rem;
+  overflow-x: auto;
+  /* Added top padding so the cross button doesn't get cut off */
+  padding: 1rem 0.8rem 0.8rem 0.8rem; 
+  z-index: 100;
+  pointer-events: auto;
+  
+  /* Crucial for smooth mobile scrolling */
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
+  
+  /* Hide scrollbar for a cleaner floating look, but keep functionality */
+  scrollbar-width: none; 
+}
+
+.shelf-page__pinned-tray::-webkit-scrollbar {
+  display: none;
+}
+
+.shelf-page__pinned-tile {
+  flex: 0 0 auto;
+  width: 65px;
+  
+  /* Completely Transparent */
+  background: transparent;
+  border: none;
+  backdrop-filter: none;
+  box-shadow: none;
+  
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  position: relative;
+}
+
+.shelf-page__pinned-tile-img {
+  width: 55px;
+  height: 55px;
+  border-radius: 8px;
+  object-fit: cover;
+  background: #fff; /* Keeps image background white in case of transparent PNGs */
+  box-shadow: 0 4px 10px rgba(0,0,0,0.15); /* Slight shadow to lift image off the 3D background */
+}
+
+.shelf-page__pinned-tile-fallback {
+  width: 55px;
+  height: 55px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 800;
+  text-align: center;
+  line-height: 1.1;
+  overflow: hidden;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+}
+
+.shelf-page__pinned-tile-name {
+  font-size: 0.7rem;
+  font-family: 'Manrope', sans-serif;
+  font-weight: 800;
+  color: #0d5537;
+  text-align: center;
+  width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  /* Adds a white glow around the text so it is readable over any 3D shelf background */
+  text-shadow: 0px 1px 3px rgba(255, 255, 255, 0.9), 0px -1px 3px rgba(255, 255, 255, 0.9);
+}
+
+.shelf-page__pinned-tile-remove {
+  position: absolute;
+  top: -6px;
+  right: -2px;
+  width: 22px;
+  height: 22px;
+  background: #ff4d4f;
+  color: white;
+  border: 2px solid #fff; /* White border to make it pop */
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: bold;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+  transition: transform 0.15s, background 0.15s;
+  z-index: 2;
+}
+
+.shelf-page__pinned-tile-remove:hover {
+  background: #d9363e;
+  transform: scale(1.1);
 }

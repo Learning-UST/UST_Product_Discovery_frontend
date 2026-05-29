@@ -1902,14 +1902,63 @@ function ShelfExperiencePage({ store, layout, onBack, onQrShelfDetected, isQrLoa
             <span>3D shelf preview unavailable</span>
           </div>
         )}
+
+      {selectedProducts.length > 0 && (
+          <div className="shelf-page__pinned-tray">
+            {selectedProducts.map((product, idx) => {
+              const id = product.id || product.name || product.product_name || idx;
+              const label = product.name || product.product_name || 'Product';
+              const brandLabel = product.brand ? product.brand.split(' ')[0] : label.split(' ')[0];
+              const color = getBrandColor(product.brand, product.name);
+              
+              // Ensure we have a valid image source, or fallback to the product name
+              const imgName = encodeURIComponent(label.replace(/%/g, ' Percent'));
+              const imgSrc = product.image_url 
+                ? `/${product.image_url.replace(/^\//, '')}` 
+                : `/images/${imgName}.png`;
+
+              return (
+                <div key={id} className="shelf-page__pinned-tile">
+                  <img 
+                    src={imgSrc} 
+                    alt={label} 
+                    className="shelf-page__pinned-tile-img"
+                    onError={(e) => {
+                      e.target.style.display = 'none';
+                      e.target.nextSibling.style.display = 'flex';
+                    }}
+                  />
+                  <div 
+                    className="shelf-page__pinned-tile-fallback" 
+                    style={{ background: color, display: 'none' }}
+                  >
+                    {brandLabel}
+                  </div>
+                  <span className="shelf-page__pinned-tile-name" title={label}>{label}</span>
+                  <button
+                    type="button"
+                    className="shelf-page__pinned-tile-remove"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      removeSelected(product);
+                    }}
+                    aria-label="Remove"
+                  >
+                    &#x2715;
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* ── Body ── */}
       <div className="shelf-page__body shelf-page__body--elevated">
-        {/* Selected product chips */}
 
         {/* Selected product chips */}
-        {selectedProducts.length > 0 && (
+        {/* {selectedProducts.length > 0 && (
           <div className="shelf-page__chips">
             {selectedProducts.map((product) => {
               const id = product.id || product.name || product.product_name
@@ -1929,7 +1978,7 @@ function ShelfExperiencePage({ store, layout, onBack, onQrShelfDetected, isQrLoa
               )
             })}
           </div>
-        )}
+        )} */}
 
         {/* FAB for toggling views */}
         {/* FAB for toggling views - Now a circular icon */}
