@@ -1998,3 +1998,58 @@
     font-size: 0.86rem;
   }
 }
+/* ── View Toggle FAB (Circular Icon) ── */
+.shelf-page__view-toggle-fab {
+  position: fixed;
+  bottom: 4.5rem;
+  right: 1.5rem;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 3.5rem;
+  height: 3.5rem;
+  background: #0d5537;
+  color: #fff;
+  border: none;
+  border-radius: 50%;
+  box-shadow: 0 4px 12px rgba(13, 85, 55, 0.4);
+  cursor: pointer;
+  transition: transform 0.2s, background 0.2s, box-shadow 0.2s;
+}
+
+.shelf-page__view-toggle-fab:hover {
+  background: #0a3f28;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(13, 85, 55, 0.5);
+}
+
+.shelf-page__view-toggle-fab svg {
+  width: 1.6rem;
+  height: 1.6rem;
+}
+
+/* ── Chat Area Wrapper ── */
+.shelf-page__chat-area {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0; 
+}
+
+/* ── Adjust Results Panel for Full Height Tabbed View ── */
+.shelf-page__results-summary::after {
+  content: none !important; 
+}
+
+.shelf-page__results-summary {
+  cursor: default; 
+  border-bottom: 1px solid #e3eae5;
+  padding-bottom: 0.5rem;
+}
+
+/* Overriding the default constraints to force full bottom height */
+.shelf-page__results-panel {
+  max-height: none !important;
+  padding-bottom: 5rem !important; /* Prevents the FAB from overlapping the last product */
+}

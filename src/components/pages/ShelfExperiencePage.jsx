@@ -275,6 +275,7 @@ const normalizeUpcValue = (value) => {
 //   )
 // }
 
+
 const formatIngredients = (ingredients) => {
   if (Array.isArray(ingredients)) {
     return ingredients.join(', ');
@@ -373,7 +374,6 @@ function ProductCard({ product, shelfFolder, expanded, onToggle, selected, onSel
     : null
 
   const handleImgError = () => setAttempt((a) => a + 1)
-
   const { nutrients, ingredients: parsedIngredients } = parseNutrition(product.nutritional_facts)
   const ingredientsList = product.ingredients || parsedIngredients
   const formattedIngredients = formatIngredients(ingredientsList)
@@ -518,6 +518,8 @@ function ProductCard({ product, shelfFolder, expanded, onToggle, selected, onSel
 }
 
 function ShelfExperiencePage({ store, layout, onBack, onQrShelfDetected, isQrLoading = false }) {
+
+  const [activeView, setActiveView] = useState('chat')
   const [fullLayout, setFullLayout] = useState(null)
   const [products, setProducts] = useState([])
   const [shelfMeta, setShelfMeta] = useState({ aisleNumber: '1', shelfCode: '' })
@@ -1905,6 +1907,8 @@ function ShelfExperiencePage({ store, layout, onBack, onQrShelfDetected, isQrLoa
       {/* ── Body ── */}
       <div className="shelf-page__body shelf-page__body--elevated">
         {/* Selected product chips */}
+
+        {/* Selected product chips */}
         {selectedProducts.length > 0 && (
           <div className="shelf-page__chips">
             {selectedProducts.map((product) => {
@@ -1927,208 +1931,240 @@ function ShelfExperiencePage({ store, layout, onBack, onQrShelfDetected, isQrLoa
           </div>
         )}
 
-        {/* Chat assistant */}
-        <div className="shelf-page__chat-toolbar">
-          <span className="shelf-page__chat-title">Chat history</span>
-          <button
-            type="button"
-            className="shelf-page__chat-clear-btn"
-            onClick={clearChatHistory}
-            disabled={chatHistory.length === 0}
-          >
-            Clear chat
-          </button>
-        </div>
-        <div className="shelf-page__chat-history" ref={chatHistoryRef}>
-          {chatHistory.length === 0 && (
-            <div className="shelf-page__chat-placeholder">AI response will appear here...</div>
-          )}
-          {chatHistory.map((msg, idx) => (
-            <div
-              key={idx}
-              className={
-                'shelf-page__chat-bubble ' +
-                (msg.role === 'user' ? 'shelf-page__chat-bubble--user' : 'shelf-page__chat-bubble--ai')
-              }
-            >
-              {(msg.text === 'Thinking...' || msg.text === 'Searching...') ? (
-                <span className="shelf-page__chat-loading">
-                  {msg.text}
-                  <span className="shelf-page__chat-dots" aria-hidden="true">
-                    <span />
-                    <span />
-                    <span />
-                  </span>
-                </span>
-              ) : (
-                msg.text.split('\n').map((line, i) => (
-                  <span key={i}>
-                    {renderMarkdownBold(line, i)}
-                    {i < msg.text.split('\n').length - 1 && <br />}
-                  </span>
-                ))
-              )}
-            </div>
-          ))}
-        </div>
-
-        {/* Products section (collapsible so the 60% panel can feel like a chat-first assistant) */}
-        <details className="shelf-page__results" open>
-          <summary className="shelf-page__results-summary">
-            {(() => {
-              const offShelfChatProducts = chatProducts.filter(cp => {
-                const cpNormalized = normalizeProductName(cp.name || cp.product_name)
-                return !products.some(sp => normalizeProductName(sp.name) === cpNormalized)
-              })
-              const hasOffShelf = offShelfChatProducts.length > 0
-              const shelfOnlyCount = products.length
-
-              return hasOffShelf
-                ? `The similar products are (${loading ? '…' : shelfOnlyCount})`
-                : `Products on this shelf (${loading ? '…' : displayedProducts.length})`
-            })()}
-          </summary>
-
-          <div className="shelf-page__results-panel">
-            {loading && <p className="shelf-page__status">Loading shelf data…</p>}
-            {!loading && !error && isProductsEnriching && (
-              <p className="shelf-page__status shelf-page__status--with-loader" aria-live="polite">
-                <span className="shelf-page__inline-loader" aria-hidden="true">
-                  <span className="shelf-page__inline-loader-dot" />
-                  <span className="shelf-page__inline-loader-dot" />
-                  <span className="shelf-page__inline-loader-dot" />
-                </span>
-                <span>Loading product prices and details…</span>
-              </p>
-            )}
-            {error && <p className="shelf-page__error">{error}</p>}
-
-            {!loading && !error && displayedProducts.length === 0 && (
-              <p className="shelf-page__status">No products found{searchTerm ? ' for your search' : ' on this shelf'}.</p>
-            )}
-
-            <ul className="shelf-page__products" role="list">
-              {displayedProducts.map((product, i) => {
-                const key = product.id ?? i
-                const source = product._source || 'shelf'
-                const isOffShelf = source === 'chat' && !products.some(sp => normalizeProductName(sp.name) === normalizeProductName(product.name))
-                const isAiResult = aiResultNameSet.has(normalizeProductName(product.name || product.product_name || product.ProductName || ''))
-                return (
-                  <ProductCard
-                    key={key}
-                    product={product}
-                    shelfFolder={shelfMeta.shelfCode}
-                    expanded={expandedId === key}
-                    onToggle={() => toggleProduct(key, product)}
-                    selected={isProductSelected(product)}
-                    onSelectToggle={() => toggleSelectedProduct(product)}
-                    source={source}
-                    isOffShelf={isOffShelf}
-                    isAiResult={isAiResult}
-                  />
-                )
-              })}
-            </ul>
-          </div>
-        </details>
-
-        {speechError && <p className="shelf-page__status shelf-page__status--voice">{speechError}</p>}
-
-        <div className="shelf-page__search-row">
-          <div className="shelf-page__search-wrap">
-            <svg className="shelf-page__search-icon" viewBox="0 0 20 20" fill="none" aria-hidden="true">
-              <circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" strokeWidth="1.5" />
-              <path d="M13 13l3.5 3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+        {/* FAB for toggling views */}
+        {/* FAB for toggling views - Now a circular icon */}
+        <button 
+          type="button" 
+          className="shelf-page__view-toggle-fab"
+          onClick={() => setActiveView(prev => prev === 'chat' ? 'products' : 'chat')}
+          aria-label={activeView === 'chat' ? 'View Products' : 'Open Chat'}
+        >
+          {activeView === 'chat' ? (
+            /* List Icon for Products */
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="8" y1="6" x2="21" y2="6"></line>
+              <line x1="8" y1="12" x2="21" y2="12"></line>
+              <line x1="8" y1="18" x2="21" y2="18"></line>
+              <line x1="3" y1="6" x2="3.01" y2="6"></line>
+              <line x1="3" y1="12" x2="3.01" y2="12"></line>
+              <line x1="3" y1="18" x2="3.01" y2="18"></line>
             </svg>
-            <input
-              type="search"
-              className="shelf-page__search"
-              placeholder="Ask about this shelf or search products..."
-              value={searchTerm}
-              onChange={(e) => {
-                const value = e.target.value
-                setSearchTerm(value)
-                if (!value.trim()) {
-                  setShowDropdown(false)
-                  return
-                }
-                setShowDropdown(!isQuestionInput(value))
-              }}
-              onFocus={() => {
-                if (searchTerm.trim() && !isQuestionInput(searchTerm) && dropdownResults.length > 0) {
-                  setShowDropdown(true)
-                }
-              }}
-              onBlur={() => setTimeout(() => setShowDropdown(false), 150)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault()
-                  setShowDropdown(false)
-                  handleAskAI()
-                }
-              }}
-              autoComplete="off"
-            />
-            <button
-              type="button"
-              className={`shelf-page__mic-btn ${isListening ? 'is-listening' : ''}`}
-              aria-label={isListening ? 'Listening...' : 'Voice search'}
-              onClick={handleVoiceSearch}
-              disabled={isListening}
-              title={isListening ? 'Listening...' : 'Click to search by voice'}
-            >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
-                <rect x="9" y="3" width="6" height="11" rx="3" />
-                <path d="M6.5 11v1.2a5.5 5.5 0 0 0 11 0V11" strokeLinecap="round" />
-                <path d="M12 18v3M9 21h6" strokeLinecap="round" />
-              </svg>
-              {isListening && <span className="shelf-page__mic-pulse" aria-hidden="true" />}
-            </button>
-            {showDropdown && dropdownResults.length > 0 && (
-              <ul className="shelf-page__search-dropdown" role="listbox">
-                <li className="shelf-page__search-dropdown-header">
-                  <span className="shelf-page__search-dropdown-title">Results</span>
-                  <button
-                    type="button"
-                    className="shelf-page__search-dropdown-close"
-                    aria-label="Close dropdown"
-                    onMouseDown={(event) => event.preventDefault()}
-                    onClick={() => setShowDropdown(false)}
-                  >
-                    &#x2715;
-                  </button>
-                </li>
-                {dropdownResults.map((product, i) => {
-                  const selected = selectedProducts.some((item) => (item.id || item.name || item.product_name) === (product.id || product.name || product.product_name))
-                  return (
-                    <li
-                      key={product.id || i}
-                      role="option"
-                      aria-selected={selected}
-                      className={`shelf-page__search-option${selected ? ' is-selected' : ''}`}
-                      onMouseDown={() => handleSelectProduct(product)}
-                    >
-                      <span className="shelf-page__search-option-name">{product.name}</span>
-                      {product.brand && <span className="shelf-page__search-option-brand">{product.brand}</span>}
-                      {products.some((p) => (p.name || '').toLowerCase() === (product.name || '').toLowerCase()) && (
-                        <span className="shelf-page__search-option-on-shelf">On shelf</span>
-                      )}
-                      {selected && <span className="shelf-page__search-option-check">&#10003;</span>}
+          ) : (
+            /* Chat Bubble Icon */
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path>
+            </svg>
+          )}
+        </button>
+
+        {/* --- TOGGLEABLE CONTENT AREA --- */}
+        {activeView === 'chat' ? (
+          <div className="shelf-page__chat-area">
+            {/* Chat assistant */}
+            {/* <div className="shelf-page__chat-toolbar">
+              <span className="shelf-page__chat-title">Chat history</span>
+              <button
+                type="button"
+                className="shelf-page__chat-clear-btn"
+                onClick={clearChatHistory}
+                disabled={chatHistory.length === 0}
+              >
+                Clear chat
+              </button>
+            </div> */}
+            
+            <div className="shelf-page__chat-history" ref={chatHistoryRef}>
+              {chatHistory.length === 0 && (
+                <div className="shelf-page__chat-placeholder">AI response will appear here...</div>
+              )}
+              {chatHistory.map((msg, idx) => (
+                <div
+                  key={idx}
+                  className={
+                    'shelf-page__chat-bubble ' +
+                    (msg.role === 'user' ? 'shelf-page__chat-bubble--user' : 'shelf-page__chat-bubble--ai')
+                  }
+                >
+                  {(msg.text === 'Thinking...' || msg.text === 'Searching...') ? (
+                    <span className="shelf-page__chat-loading">
+                      {msg.text}
+                      <span className="shelf-page__chat-dots" aria-hidden="true">
+                        <span />
+                        <span />
+                        <span />
+                      </span>
+                    </span>
+                  ) : (
+                    msg.text.split('\n').map((line, i) => (
+                      <span key={i}>
+                        {renderMarkdownBold(line, i)}
+                        {i < msg.text.split('\n').length - 1 && <br />}
+                      </span>
+                    ))
+                  )}
+                </div>
+              ))}
+            </div>
+
+            {speechError && <p className="shelf-page__status shelf-page__status--voice">{speechError}</p>}
+
+            {/* Chat Search Row */}
+            <div className="shelf-page__search-row">
+              <div className="shelf-page__search-wrap">
+                <svg className="shelf-page__search-icon" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                  <circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" strokeWidth="1.5" />
+                  <path d="M13 13l3.5 3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                </svg>
+                <input
+                  type="search"
+                  className="shelf-page__search"
+                  placeholder="Ask about this shelf or search products..."
+                  value={searchTerm}
+                  onChange={(e) => {
+                    const value = e.target.value
+                    setSearchTerm(value)
+                    if (!value.trim()) {
+                      setShowDropdown(false)
+                      return
+                    }
+                    setShowDropdown(!isQuestionInput(value))
+                  }}
+                  onFocus={() => {
+                    if (searchTerm.trim() && !isQuestionInput(searchTerm) && dropdownResults.length > 0) {
+                      setShowDropdown(true)
+                    }
+                  }}
+                  onBlur={() => setTimeout(() => setShowDropdown(false), 150)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                      setShowDropdown(false)
+                      handleAskAI()
+                    }
+                  }}
+                  autoComplete="off"
+                />
+                <button
+                  type="button"
+                  className={`shelf-page__mic-btn ${isListening ? 'is-listening' : ''}`}
+                  aria-label={isListening ? 'Listening...' : 'Voice search'}
+                  onClick={handleVoiceSearch}
+                  disabled={isListening}
+                  title={isListening ? 'Listening...' : 'Click to search by voice'}
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+                    <rect x="9" y="3" width="6" height="11" rx="3" />
+                    <path d="M6.5 11v1.2a5.5 5.5 0 0 0 11 0V11" strokeLinecap="round" />
+                    <path d="M12 18v3M9 21h6" strokeLinecap="round" />
+                  </svg>
+                  {isListening && <span className="shelf-page__mic-pulse" aria-hidden="true" />}
+                </button>
+                {showDropdown && dropdownResults.length > 0 && (
+                  <ul className="shelf-page__search-dropdown" role="listbox">
+                    <li className="shelf-page__search-dropdown-header">
+                      <span className="shelf-page__search-dropdown-title">Results</span>
+                      <button
+                        type="button"
+                        className="shelf-page__search-dropdown-close"
+                        aria-label="Close dropdown"
+                        onMouseDown={(event) => event.preventDefault()}
+                        onClick={() => setShowDropdown(false)}
+                      >
+                        &#x2715;
+                      </button>
                     </li>
+                    {dropdownResults.map((product, i) => {
+                      const selected = selectedProducts.some((item) => (item.id || item.name || item.product_name) === (product.id || product.name || product.product_name))
+                      return (
+                        <li
+                          key={product.id || i}
+                          role="option"
+                          aria-selected={selected}
+                          className={`shelf-page__search-option${selected ? ' is-selected' : ''}`}
+                          onMouseDown={() => handleSelectProduct(product)}
+                        >
+                          <span className="shelf-page__search-option-name">{product.name}</span>
+                          {product.brand && <span className="shelf-page__search-option-brand">{product.brand}</span>}
+                          {products.some((p) => (p.name || '').toLowerCase() === (product.name || '').toLowerCase()) && (
+                            <span className="shelf-page__search-option-on-shelf">On shelf</span>
+                          )}
+                          {selected && <span className="shelf-page__search-option-check">&#10003;</span>}
+                        </li>
+                      )
+                    })}
+                  </ul>
+                )}
+              </div>
+              <button
+                type="button"
+                className="shelf-page__ask-btn"
+                onClick={() => handleAskAI()}
+                disabled={!searchTerm.trim()}
+              >
+                Ask AI
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="shelf-page__results" style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, marginTop: '0', borderTop: 'none', paddingTop: 0 }}>
+            <div className="shelf-page__results-summary" style={{ marginBottom: '0.8rem', flexShrink: 0 }}>
+              {(() => {
+                const offShelfChatProducts = chatProducts.filter(cp => {
+                  const cpNormalized = normalizeProductName(cp.name || cp.product_name)
+                  return !products.some(sp => normalizeProductName(sp.name) === cpNormalized)
+                })
+                const hasOffShelf = offShelfChatProducts.length > 0
+                const shelfOnlyCount = products.length
+
+                return hasOffShelf
+                  ? `The similar products are (${loading ? '…' : shelfOnlyCount})`
+                  : `Products on this shelf (${loading ? '…' : displayedProducts.length})`
+              })()}
+            </div>
+
+            <div className="shelf-page__results-panel" style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
+              {loading && <p className="shelf-page__status">Loading shelf data…</p>}
+              {!loading && !error && isProductsEnriching && (
+                <p className="shelf-page__status shelf-page__status--with-loader" aria-live="polite">
+                  <span className="shelf-page__inline-loader" aria-hidden="true">
+                    <span className="shelf-page__inline-loader-dot" />
+                    <span className="shelf-page__inline-loader-dot" />
+                    <span className="shelf-page__inline-loader-dot" />
+                  </span>
+                  <span>Loading product prices and details…</span>
+                </p>
+              )}
+              {error && <p className="shelf-page__error">{error}</p>}
+
+              {!loading && !error && displayedProducts.length === 0 && (
+                <p className="shelf-page__status">No products found{searchTerm ? ' for your search' : ' on this shelf'}.</p>
+              )}
+
+              <ul className="shelf-page__products" role="list">
+                {displayedProducts.map((product, i) => {
+                  const key = product.id ?? i
+                  const source = product._source || 'shelf'
+                  const isOffShelf = source === 'chat' && !products.some(sp => normalizeProductName(sp.name) === normalizeProductName(product.name))
+                  const isAiResult = aiResultNameSet.has(normalizeProductName(product.name || product.product_name || product.ProductName || ''))
+                  return (
+                    <ProductCard
+                      key={key}
+                      product={product}
+                      shelfFolder={shelfMeta.shelfCode}
+                      expanded={expandedId === key}
+                      onToggle={() => toggleProduct(key, product)}
+                      selected={isProductSelected(product)}
+                      onSelectToggle={() => toggleSelectedProduct(product)}
+                      source={source}
+                      isOffShelf={isOffShelf}
+                      isAiResult={isAiResult}
+                    />
                   )
                 })}
               </ul>
-            )}
+            </div>
           </div>
-          <button
-            type="button"
-            className="shelf-page__ask-btn"
-            onClick={() => handleAskAI()}
-            disabled={!searchTerm.trim()}
-          >
-            Ask AI
-          </button>
-        </div>
+        )}
       </div>
     </div>
   )
