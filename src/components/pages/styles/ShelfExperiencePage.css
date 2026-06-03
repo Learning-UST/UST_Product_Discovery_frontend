@@ -157,6 +157,15 @@
     linear-gradient(110deg, #02160f 0%, #0a3f2b 48%, #2d6937 100%);
 }
 
+/* Reduce header height for laptop/desktop view */
+@media (min-width: 641px) {
+  .shelf-page__header {
+    height: 4.4rem;
+    min-height: 4.4rem;
+    box-sizing: border-box;
+  }
+}
+
 .shelf-page__header-actions {
   position: absolute;
   top: 1.1rem;
@@ -417,6 +426,15 @@
 
   .shelf-page__viewer-iframe {
     transform: none;
+  }
+}
+
+/* Increase planogram size for laptop/desktop view */
+@media (min-width: 641px) {
+  .shelf-page__viewer-wrap {
+    height: 85vh;
+    min-height: 600px;
+    max-height: 95vh;
   }
 }
 
@@ -1943,6 +1961,28 @@
 .shelf-page__search-dropdown {
   top: auto;
   bottom: calc(100% + 6px);
+}
+
+/* Laptop-only layout tuning: bigger planogram, tighter chat card */
+@media (min-width: 641px) and (max-width: 1440px) {
+  .shelf-page {
+    grid-template-rows: auto minmax(0, 52fr) minmax(0, 48fr);
+  }
+
+  .shelf-page__viewer-wrap {
+    width: 100%;
+    max-width: 100%;
+    margin: 0;
+    border-radius: 0;
+  }
+
+  .shelf-page__body {
+    width: min(1100px, calc(100% - 1.25rem));
+  }
+
+  .shelf-page__body--elevated {
+    padding: 0.8rem;
+  }
 }
 
 @media (width <= 640px) {

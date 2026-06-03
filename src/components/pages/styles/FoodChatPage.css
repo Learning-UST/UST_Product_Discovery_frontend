@@ -159,7 +159,7 @@
 .food-chat-typing .dot {
   width: 8px;
   height: 8px;
-  background: #ffb347;
+  background: #0d5537;
   border-radius: 50%;
   display: inline-block;
   animation: chat-typing-bounce 1.2s infinite both;
@@ -171,6 +171,58 @@
 
 .food-chat-typing .dot:nth-child(3) {
   animation-delay: 0.4s;
+}
+
+.food-chat-response {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.food-chat-response__space {
+  height: 0.5rem;
+}
+
+.food-chat-response__line {
+  display: flex;
+  align-items: baseline;
+  gap: 0.35rem;
+}
+
+.food-chat-response__line--title {
+  align-items: center;
+  gap: 0.42rem;
+}
+
+.food-chat-response__bullet {
+  color: #6f8178;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.food-chat-signal {
+  width: 0.62rem;
+  height: 0.62rem;
+  border-radius: 999px;
+  display: inline-block;
+  flex: 0 0 auto;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.08) inset;
+}
+
+.food-chat-signal--green {
+  background: #22c55e;
+}
+
+.food-chat-signal--yellow {
+  background: #facc15;
+}
+
+.food-chat-signal--orange {
+  background: #f97316;
+}
+
+.food-chat-signal--red {
+  background: #ef4444;
 }
 
 @keyframes chat-typing-bounce {

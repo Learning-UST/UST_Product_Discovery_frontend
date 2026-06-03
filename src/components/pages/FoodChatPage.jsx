@@ -29,6 +29,13 @@ import { sendFoodChatQuery } from '../../services/api';
 // (Removed duplicate useEffect import)
 import { useNavigate } from 'react-router-dom';
 
+const FOOD_SIGNAL_COLORS = {
+  GREEN: 'green',
+  YELLOW: 'yellow',
+  ORANGE: 'orange',
+  RED: 'red',
+};
+
 const FoodChatPage = () => {
   const [messages, setMessages] = useState([]);
   const navigate = useNavigate();
@@ -94,6 +101,56 @@ const FoodChatPage = () => {
       setMessages((msgs) => [...msgs, { role: 'assistant', content: 'Sorry, something went wrong.' }]);
     }
     setLoading(false);
+  };
+
+  const renderBoldSegments = (text, keyBase) => {
+    const parts = String(text || '').split(/(\*\*[^*]+\*\*)/g);
+    return parts.map((part, index) => {
+      const match = part.match(/^\*\*(.+)\*\*$/);
+      if (match) {
+        return <strong key={`${keyBase}-b-${index}`}>{match[1]}</strong>;
+      }
+      return <span key={`${keyBase}-t-${index}`}>{part}</span>;
+    });
+  };
+
+  const renderAssistantContent = (content, messageIndex) => {
+    const lines = String(content || '').split('\n');
+
+    return (
+      <div className="food-chat-response">
+        {lines.map((rawLine, lineIndex) => {
+          const line = rawLine.trim();
+
+          if (!line) {
+            return <div key={`space-${messageIndex}-${lineIndex}`} className="food-chat-response__space" />;
+          }
+
+          const titleWithSignal = line.match(/^[-*]\s*\*\*(.+?)\*\*\s*\[(GREEN|YELLOW|ORANGE|RED)\]\s*$/i);
+          if (titleWithSignal) {
+            const foodName = titleWithSignal[1].trim();
+            const signalKey = titleWithSignal[2].toUpperCase();
+            const signalTone = FOOD_SIGNAL_COLORS[signalKey] || 'green';
+
+            return (
+              <div key={`title-${messageIndex}-${lineIndex}`} className="food-chat-response__line food-chat-response__line--title">
+                <span className="food-chat-response__bullet" aria-hidden="true">•</span>
+                <strong>{foodName}</strong>
+                <span className={`food-chat-signal food-chat-signal--${signalTone}`} aria-label={`${signalKey} signal`} title={signalKey} />
+              </div>
+            );
+          }
+
+          const plainLine = line.replace(/^[-*]\s*/, '');
+          return (
+            <div key={`line-${messageIndex}-${lineIndex}`} className="food-chat-response__line">
+              <span className="food-chat-response__bullet" aria-hidden="true">•</span>
+              <span>{renderBoldSegments(plainLine, `${messageIndex}-${lineIndex}`)}</span>
+            </div>
+          );
+        })}
+      </div>
+    );
   };
 
   return (
@@ -186,15 +243,9 @@ const FoodChatPage = () => {
           whiteSpace: 'pre-line',
         }}
       >
-        <span
-          dangerouslySetInnerHTML={{
-            __html: (msg.content || '')
-              .replace(/&/g, '&amp;')
-              .replace(/</g, '&lt;')
-              .replace(/>/g, '&gt;')
-              .replace(/\*\*(.*?)\*\*/g, '<b>$1</b>'),
-          }}
-        />
+        {msg.role === 'assistant'
+          ? renderAssistantContent(msg.content, idx)
+          : <span>{msg.content || ''}</span>}
       </div>
     </div>
   ))}
