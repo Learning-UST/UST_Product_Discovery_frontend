@@ -600,8 +600,7 @@ function ShelfExperiencePage({ store, layout, onBack, onQrShelfDetected, isQrLoa
     const repeatedHighlights = viewerHighlightedProducts
       .map((name) => `&highlightProducts=${encodeURIComponent(name)}`)
       .join('')
-    // return `${repeatedHighlights}&dimOthers=true`
-    return `${repeatedHighlights}&maskOthers=true&maskColor=%23ffffff&maskOpacity=0.60`
+    return `${repeatedHighlights}&dimOthers=true&maskOthers=true&maskColor=%23ffffff&maskOpacity=0.70`
     
   }, [viewerHighlightedProducts])
 
