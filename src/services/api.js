@@ -255,6 +255,28 @@ export const setAgentProvider = async (cloudProvider) => {
     };
 };
 
+export const getCloudProviderStatus = async () => {
+    const response = await runtimeFetch(`${FLASK_BASE_URL}/api/cloud-provider`);
+
+    let payload = null;
+    try {
+        payload = await response.json();
+    } catch {
+        payload = null;
+    }
+
+    if (!response.ok) {
+        const errorMessage = payload?.error || payload?.message || 'Failed to fetch cloud provider status';
+        throw new Error(errorMessage);
+    }
+
+    return payload || {
+        status: 'ok',
+        cloud_provider: 'aws',
+        supported_providers: ['azure', 'aws'],
+    };
+};
+
 export const getSpeechToken = async () => {
     const response = await runtimeFetch(`${FLASK_BASE_URL}/api/speech-to-text`, {
         method: 'POST',
