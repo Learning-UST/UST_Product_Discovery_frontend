@@ -839,16 +839,19 @@ function ShelfExperiencePage({ store, layout, onBack, onQrShelfDetected, isQrLoa
       ])
     } else {
       setHighlightedProduct('')
-      setChatHistory((prev) => [
-        ...prev,
+      const nextHistory = [
+        ...chatHistory,
         { role: 'user', text: selectedLabel },
+      ]
+      setChatHistory([
+        ...nextHistory,
         { role: 'ai', text: 'Searching...' }
       ])
       try {
         const storeName = store?.name || 'this store'
         const shelfName = layout?.name || 'this shelf'
         const userQuery = `The product "${selectedLabel}" is not on "${shelfName}". Which shelf or section would I find it? Please be specific.`
-        const messages = buildMessagesFromHistory(chatHistory)
+        const messages = buildMessagesFromHistory(nextHistory)
         const res = await sendChatQuery(userQuery, messages)
         setChatHistory((prev) => [
           ...prev.slice(0, -1), // Remove 'Searching...'
@@ -1193,14 +1196,17 @@ function ShelfExperiencePage({ store, layout, onBack, onQrShelfDetected, isQrLoa
         ? `Answer only for these selected shelf products: ${selectedLabels.join(', ')}. User question: ${query}`
         : query
 
-    setChatHistory((prev) => [
-      ...prev,
+    const nextHistory = [
+      ...chatHistory,
       { role: 'user', text: query },
+    ]
+    setChatHistory([
+      ...nextHistory,
       { role: 'ai', text: 'Thinking...' }
     ])
 
     try {
-      const messages = buildMessagesFromHistory(chatHistory)
+      const messages = buildMessagesFromHistory(nextHistory)
       const res = await sendChatQuery(scopedQuery, messages)
       const answerText = res.answer || ''
 

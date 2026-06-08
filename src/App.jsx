@@ -97,7 +97,7 @@ import HowItWorksSection from './components/sections/HowItWorksSection'
 import StoresSection from './components/sections/StoresSection'
 import { useSmoothScroll } from './hooks/useSmoothScroll'
 import { fetchLayoutById, fetchPlanogramStoreById } from './services/planogramStoresApi'
-import { getRuntimePreferences, setRuntimePreferences, setAgentProvider, getCloudProviderStatus } from './services/api'
+import { getRuntimePreferences, setRuntimePreferences, setAgentProvider } from './services/api'
 import './App.css'
 
 const AUTH_STORAGE_KEY = 'shopilotAuthSession:v1'
@@ -390,28 +390,6 @@ function App() {
   }, []) // Run ONLY once on mount
 
   useEffect(() => {
-    let cancelled = false
-
-    const syncCloudProviderFromBackend = async () => {
-      try {
-        const status = await getCloudProviderStatus()
-        if (cancelled) return
-
-        const backendProvider = normalizeCloudProviderValue(status?.cloud_provider)
-        setRuntimePrefs((prev) => ({ ...prev, cloudProvider: backendProvider }))
-      } catch (error) {
-        console.warn('Failed to fetch backend cloud provider status:', error)
-      }
-    }
-
-    void syncCloudProviderFromBackend()
-
-    return () => {
-      cancelled = true
-    }
-  }, [])
-
-  useEffect(() => {
     setRuntimePreferences(runtimePrefs)
   }, [runtimePrefs])
 
@@ -571,9 +549,6 @@ function App() {
 
     try {
       await setAgentProvider(normalizedCloudProvider)
-      const status = await getCloudProviderStatus()
-      const confirmedProvider = normalizeCloudProviderValue(status?.cloud_provider)
-      setRuntimePrefs((prev) => ({ ...prev, cloudProvider: confirmedProvider }))
     } catch (error) {
       console.error('Failed to update backend cloud provider:', error)
       setRuntimePrefs((prev) => ({ ...prev, cloudProvider: previousCloudProvider }))

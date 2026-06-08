@@ -77,6 +77,7 @@ function StoreExperiencePage({ store, onChangeStore, onLayoutSelect }) {
   const [allProducts, setAllProducts] = useState([])
   const [searchResults, setSearchResults] = useState([])
   const [selectedProducts, setSelectedProducts] = useState([])
+  const [chatHistory, setChatHistory] = useState([])
   const [showDropdown, setShowDropdown] = useState(false)
   const [productLoadError, setProductLoadError] = useState('')
   const [isListening, setIsListening] = useState(false)
@@ -471,18 +472,46 @@ function StoreExperiencePage({ store, onChangeStore, onLayoutSelect }) {
     const query = searchTerm.trim()
     if (!query) return
 
+    const buildMessagesFromHistory = (history) =>
+      history
+        .filter((item) => item.role === 'user' || item.role === 'ai')
+        .map((item) => ({
+          role: item.role === 'user' ? 'user' : 'assistant',
+          content: item.text,
+        }))
+
     const selectedLabels = getSelectedProductLabels()
     const scopedQuery =
       selectedLabels.length > 0 && !queryMentionsSelectedProduct(query, selectedLabels)
         ? `Answer only for these selected products: ${selectedLabels.join(', ')}. User question: ${query}`
         : query
 
+    const nextHistory = [
+      ...chatHistory,
+      { role: 'user', text: query },
+    ]
+    setChatHistory([
+      ...nextHistory,
+      { role: 'ai', text: 'Thinking...' },
+    ])
     setAiResponse('Thinking...')
+
     try {
-      const res = await sendChatQuery(scopedQuery)
-      setAiResponse(res.answer || JSON.stringify(res))
+      const messages = buildMessagesFromHistory(nextHistory)
+      const res = await sendChatQuery(scopedQuery, messages)
+      const answer = res.answer || JSON.stringify(res)
+      setAiResponse(answer)
+      setChatHistory([
+        ...nextHistory,
+        { role: 'ai', text: answer },
+      ])
     } catch (err) {
-      setAiResponse('Error: ' + err.message)
+      const errorText = 'Error: ' + err.message
+      setAiResponse(errorText)
+      setChatHistory([
+        ...nextHistory,
+        { role: 'ai', text: errorText },
+      ])
     }
   }
 

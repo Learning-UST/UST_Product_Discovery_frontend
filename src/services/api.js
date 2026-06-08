@@ -8,7 +8,7 @@ const CLOUD_HEADER_SENT_KEY = 'shopilotCloudHeaderSent:v1';
 
 const DEFAULT_RUNTIME_PREFS = {
     currency: 'USD',
-    cloudProvider: 'AWS',
+    cloudProvider: 'AZURE',
 };
 
 // Food chat endpoint
