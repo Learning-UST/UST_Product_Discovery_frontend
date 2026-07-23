@@ -4,6 +4,7 @@ import { getSpeechToken, fetchAllProducts, fetchDirectProductDetails, sendChatQu
 import * as SpeechSDK from 'microsoft-cognitiveservices-speech-sdk'
 import jsQR from 'jsqr'
 import { fuzzyFilter } from '../../utils/fuzzySearch'
+import { normalizeResponseProductNameCasing } from '../../utils/formatResponseText'
 
 const trimValue = (value) => (typeof value === 'string' ? value.trim() : '')
 
@@ -499,7 +500,7 @@ function StoreExperiencePage({ store, onChangeStore, onLayoutSelect }) {
     try {
       const messages = buildMessagesFromHistory(nextHistory)
       const res = await sendChatQuery(scopedQuery, messages)
-      const answer = res.answer || JSON.stringify(res)
+      const answer = normalizeResponseProductNameCasing(res.answer || JSON.stringify(res))
       setAiResponse(answer)
       setChatHistory([
         ...nextHistory,

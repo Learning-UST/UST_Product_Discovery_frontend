@@ -5,6 +5,7 @@ import * as SpeechSDK from 'microsoft-cognitiveservices-speech-sdk'
 import { fetchLayoutById } from '../../services/planogramStoresApi'
 import { fetchAllProductsFull, fetchAllProducts, fetchDirectProductDetails, getSpeechToken, sendChatQuery, fetchProductById } from '../../services/api'
 import { fuzzyFilter } from '../../utils/fuzzySearch'
+import { normalizeResponseProductNameCasing } from '../../utils/formatResponseText'
 import './styles/ShelfExperiencePage.css'
 import jsQR from "jsqr";
 
@@ -1208,7 +1209,7 @@ function ShelfExperiencePage({ store, layout, onBack, onQrShelfDetected, isQrLoa
     try {
       const messages = buildMessagesFromHistory(nextHistory)
       const res = await sendChatQuery(scopedQuery, messages)
-      const answerText = res.answer || ''
+      const answerText = normalizeResponseProductNameCasing(res.answer || '')
 
       const stripProductsLineFromAnswer = (text) => {
         const lines = String(text || '')

@@ -5,6 +5,7 @@ const DEFAULT_STORE_SCAN_BATCH_SIZE = 50
 const DEFAULT_STORE_SCAN_MISS_STREAK_LIMIT = 15
 const DEFAULT_STORE_REQUEST_TIMEOUT_MS = 10000
 const DEFAULT_STORES_CACHE_TTL_MS = 60000
+const DEFAULT_ENABLE_STORE_ID_SCAN = false
 const STORES_CACHE_KEY = 'planogramStoresCache:v1'
 
 let storesRequestInFlight = null
@@ -27,6 +28,22 @@ const parsePositiveInt = (rawValue, fallback) => {
         return fallback
     }
     return parsed
+}
+
+const parseBoolean = (rawValue, fallback) => {
+    if (rawValue === undefined || rawValue === null || rawValue === '') {
+        return fallback
+    }
+
+    const normalized = String(rawValue).trim().toLowerCase()
+    if (['1', 'true', 'yes', 'on'].includes(normalized)) {
+        return true
+    }
+    if (['0', 'false', 'no', 'off'].includes(normalized)) {
+        return false
+    }
+
+    return fallback
 }
 
 const getStoreScanConfig = () => {
@@ -54,6 +71,10 @@ const getStoreScanConfig = () => {
         import.meta.env.VITE_PLANOGRAM_STORES_CACHE_TTL_MS,
         DEFAULT_STORES_CACHE_TTL_MS
     )
+    const enableIdScan = parseBoolean(
+        import.meta.env.VITE_PLANOGRAM_ENABLE_STORE_ID_SCAN,
+        DEFAULT_ENABLE_STORE_ID_SCAN
+    )
 
     return {
         startId: Math.min(startId, maxId),
@@ -62,6 +83,7 @@ const getStoreScanConfig = () => {
         missStreakLimit,
         requestTimeoutMs,
         cacheTtlMs,
+        enableIdScan,
     }
 }
 
@@ -664,6 +686,7 @@ const fetchPlanogramStoresInternal = async ({ identity } = {}) => {
     }
 
     // 3. Try bare GET /api/stores (works if backend allows unauthenticated listing)
+    let listRequestStatus = null
     try {
         const allStores = await fetchJsonWithTimeout('/api/stores', {}, requestTimeoutMs)
         const storeList = toArray(allStores)
@@ -675,15 +698,28 @@ const fetchPlanogramStoresInternal = async ({ identity } = {}) => {
             }
         }
     } catch (error) {
+        listRequestStatus = getErrorStatusCode(error)
         // On this backend, /api/stores may return 400 without identity.
         // Fall through so ID-scan fallback can still discover stores.
-        const status = getErrorStatusCode(error)
-        if (status && status >= 500) {
+        if (listRequestStatus && listRequestStatus >= 500) {
             // Keep same fallback path for server errors.
         }
     }
 
-    // 4. Last resort: ID scan — only runs when both REST calls above fail entirely
+    const { enableIdScan } = getStoreScanConfig()
+    const shouldAttemptIdScan =
+        enableIdScan &&
+        // If stores listing is rejected with 400 and we have no identity, avoid noisy probing.
+        !(listRequestStatus === 400 && !resolvedIdentity)
+
+    if (!shouldAttemptIdScan) {
+        return {
+            stores: [],
+            hasIdentity: Boolean(resolvedIdentity),
+        }
+    }
+
+    // 4. Last resort: ID scan — only runs when enabled and both REST calls above fail entirely
     const discoveredStores = await discoverAllStoresByIdScan()
     if (discoveredStores.length > 0) {
         writeStoresCache(discoveredStores)
