@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 const USE_US_PRICE = String(import.meta.env.VITE_USE_US_PRICE || '').toLowerCase() === 'true'
 import * as SpeechSDK from 'microsoft-cognitiveservices-speech-sdk'
 import { fetchLayoutById } from '../../services/planogramStoresApi'
-import { fetchAllProductsFull, fetchAllProducts, fetchDirectProductDetails, getSpeechToken, sendChatQuery, fetchProductById } from '../../services/api'
+import { fetchAllProductsFull, fetchAllProducts, fetchDirectProductDetails, getSpeechToken, sendChatQuery, fetchProductById, fetchShelfLookupByProductNames } from '../../services/api'
 import { fuzzyFilter } from '../../utils/fuzzySearch'
 import { normalizeResponseProductNameCasing } from '../../utils/formatResponseText'
 import './styles/ShelfExperiencePage.css'
@@ -184,6 +184,39 @@ const normalizeProductName = (value) =>
     .replace(/\s+/g, ' ')
     .trim()
 
+const extractShelfIdCandidate = (value) => {
+  const raw = String(value || '').trim()
+  if (!raw) return ''
+  if (/^\d+$/.test(raw)) return raw
+  const numericMatch = raw.match(/\d+/)
+  return numericMatch?.[0] || ''
+}
+
+const resolveShelfIdFromRecord = (record) => {
+  if (!record || typeof record !== 'object') return ''
+
+  const directCandidates = [
+    record?.shelf_id,
+    record?.shelfId,
+    record?.Shelf_ID,
+    record?.ShelfId,
+    record?.shelf,
+    record?.shelf_number,
+    record?.Shelf_Number,
+    record?.fixtureDisplayName,
+    record?.shelf_name,
+    record?.Shelf_Name,
+    record?.shelfName,
+  ]
+
+  for (const value of directCandidates) {
+    const shelfId = extractShelfIdCandidate(value)
+    if (shelfId) return shelfId
+  }
+
+  return ''
+}
+
 const pickConfiguredPrice = (source = {}) => {
   if (!source || typeof source !== 'object') return null
   if (USE_US_PRICE) {
@@ -331,7 +364,7 @@ const parseNutrition = (facts) => {
   return { nutrients, ingredients }
 }
 
-function ProductCard({ product, shelfFolder, expanded, onToggle, selected, onSelectToggle, source = 'shelf', isOffShelf = false, isAiResult = false }) {
+function ProductCard({ product, shelfFolder, expanded, onToggle, selected, onSelectToggle, source = 'shelf', isOffShelf = false, offShelfLabel = '', isAiResult = false }) {
   const EXTENSIONS = ['jpg', 'png', 'jpeg', 'webp']
   const brandLabel = product.brand ? product.brand.split(' ')[0] : (product.name || '?').split(' ')[0]
   const color = getBrandColor(product.brand, product.name)
@@ -384,7 +417,7 @@ function ProductCard({ product, shelfFolder, expanded, onToggle, selected, onSel
         {isOffShelf ? (
           <>
             {/* <span className="shelf-product__source-badge-text">From AI</span> */}
-            <span className="shelf-product__source-badge-sub">(not on shelf)</span>
+            <span className="shelf-product__source-badge-sub">({offShelfLabel || 'Other shelf'})</span>
           </>
         ) : (
           <span className="shelf-product__source-badge-text">From AI</span>
@@ -532,6 +565,7 @@ function ShelfExperiencePage({ store, layout, onBack, onQrShelfDetected, isQrLoa
   const [chatHistory, setChatHistory] = useState([])
   const [expandedId, setExpandedId] = useState(null)
   const [chatProducts, setChatProducts] = useState([])
+  const [isResolvingChatShelves, setIsResolvingChatShelves] = useState(false)
   const [allStoreProducts, setAllStoreProducts] = useState([])
   const [dropdownResults, setDropdownResults] = useState([])
   const [showDropdown, setShowDropdown] = useState(false)
@@ -544,6 +578,7 @@ function ShelfExperiencePage({ store, layout, onBack, onQrShelfDetected, isQrLoa
   const [qrMessage, setQrMessage] = useState('')
   const [qrScanned, setQrScanned] = useState(false)
   const [highlightedProduct, setHighlightedProduct] = useState('')
+  const currentShelfId = extractShelfIdCandidate(layout?.id)
   const videoRef = useRef(null)
   const streamRef = useRef(null)
   const speechRecognizerRef = useRef(null)
@@ -551,6 +586,7 @@ function ShelfExperiencePage({ store, layout, onBack, onQrShelfDetected, isQrLoa
   const qrScanLoopRef = useRef(null)
   const chatHistoryRef = useRef(null)
   const catalogProductsRef = useRef(null)
+  const chatRequestSeqRef = useRef(0)
 
   const viewerHighlightedProducts = useMemo(() => {
     const shelfNameByNormalized = new Map()
@@ -560,6 +596,27 @@ function ShelfExperiencePage({ store, layout, onBack, onQrShelfDetected, isQrLoa
         shelfNameByNormalized.set(normalized, product?.layoutName || product?.name || '')
       }
     })
+
+    const matchedChatResults = chatProducts
+      .map((product) => {
+        const candidateNames = [
+          product?.layoutName,
+          product?.name,
+          product?.product_name,
+          product?.ProductName,
+        ]
+
+        for (const candidate of candidateNames) {
+          const normalized = normalizeProductName(candidate)
+          if (!normalized) continue
+          if (shelfNameByNormalized.has(normalized)) {
+            return shelfNameByNormalized.get(normalized)
+          }
+        }
+
+        return ''
+      })
+      .filter(Boolean)
 
     const matchedSelected = selectedProducts
       .map((product) => {
@@ -582,7 +639,7 @@ function ShelfExperiencePage({ store, layout, onBack, onQrShelfDetected, isQrLoa
       })
       .filter(Boolean)
 
-    const merged = [...matchedSelected]
+    const merged = [...matchedChatResults, ...matchedSelected]
     if (highlightedProduct) {
       merged.push(highlightedProduct)
     }
@@ -594,7 +651,7 @@ function ShelfExperiencePage({ store, layout, onBack, onQrShelfDetected, isQrLoa
       seen.add(normalized)
       return true
     })
-  }, [products, selectedProducts, highlightedProduct])
+  }, [products, chatProducts, selectedProducts, highlightedProduct])
 
   const viewerHighlightQuery = useMemo(() => {
     if (viewerHighlightedProducts.length === 0) return ''
@@ -777,8 +834,10 @@ function ShelfExperiencePage({ store, layout, onBack, onQrShelfDetected, isQrLoa
   }
 
   const clearChatHistory = () => {
+    chatRequestSeqRef.current += 1
     setChatHistory([])
     setChatProducts([])
+    setIsResolvingChatShelves(false)
     setExpandedId(null)
     setHighlightedProduct('')
   }
@@ -805,7 +864,9 @@ function ShelfExperiencePage({ store, layout, onBack, onQrShelfDetected, isQrLoa
   const handleSelectProduct = async (storeProduct) => {
     const pickedName = (storeProduct.name || '').toLowerCase().trim()
     const selectedLabel = storeProduct.name || ''
+    chatRequestSeqRef.current += 1
     setChatProducts([])
+    setIsResolvingChatShelves(false)
 
     setSelectedProducts((prev) => {
       const selectedId = storeProduct.id || storeProduct.name || storeProduct.product_name
@@ -984,8 +1045,43 @@ function ShelfExperiencePage({ store, layout, onBack, onQrShelfDetected, isQrLoa
       price: resolvedPrice !== '' ? resolvedPrice : pickDisplayedPrice(payload),
       diet_type: readFirstValue(payload, ['diet_type', 'Diet_Type', 'Diet Type', 'Tags', 'tags']),
       ingredients: readFirstValue(payload, ['ingredients', 'Ingredients', 'Ingredient_List', 'ingredient_list', 'ingredient', 'Ingredients_List']),
+      shelf_id: readFirstValue(payload, ['shelf_id', 'shelfId', 'Shelf_ID', 'ShelfId', 'shelf', 'shelf_number', 'Shelf_Number', 'fixtureDisplayName']),
+      shelf_name: readFirstValue(payload, ['shelf_name', 'shelfName', 'Shelf_Name']),
       id: readFirstValue(payload, ['id', 'UPC', 'upc']) || fallbackValue,
     }
+  }
+
+  const resolveProductShelfId = (product, resolvedUpc = '') => {
+    const directShelfId = resolveShelfIdFromRecord(product)
+    if (directShelfId) {
+      return directShelfId
+    }
+
+    const normalizedName = normalizeProductName(product?.name || product?.product_name || product?.ProductName || '')
+    if (normalizedName) {
+      const shelfMatch = products.find((item) =>
+        normalizeProductName(item?.name || item?.product_name || item?.ProductName || '') === normalizedName
+      )
+      if (shelfMatch) {
+        return currentShelfId || resolveShelfIdFromRecord(shelfMatch)
+      }
+    }
+
+    const catalogProducts = Array.isArray(catalogProductsRef.current) ? catalogProductsRef.current : []
+    if (catalogProducts.length === 0) {
+      return ''
+    }
+
+    const normalizedUpc = normalizeUpcValue(resolvedUpc || product?.upc || product?.UPC || '')
+    const matchedCatalog = catalogProducts.find((item) => {
+      const itemUpc = normalizeUpcValue(readFirstValue(item, ['upc', 'UPC']))
+      if (normalizedUpc && itemUpc && normalizedUpc === itemUpc) return true
+      if (!normalizedName) return false
+      const itemName = normalizeProductName(readFirstValue(item, ['name', 'Name', 'product_name', 'ProductName']))
+      return itemName && itemName === normalizedName
+    })
+
+    return resolveShelfIdFromRecord(matchedCatalog)
   }
 
   const hasCompleteDetails = (product) =>
@@ -1033,6 +1129,8 @@ function ShelfExperiencePage({ store, layout, onBack, onQrShelfDetected, isQrLoa
           diet_type: product.diet_type || mapped.diet_type,
           image_url: product.image_url || mapped.image_url,
           upc: product.upc || mapped.upc,
+          shelf_id: product.shelf_id || mapped.shelf_id,
+          shelf_name: product.shelf_name || mapped.shelf_name,
           price: product.price ?? mapped.price ?? null,
           id: product.id || mapped.id,
         }
@@ -1069,6 +1167,8 @@ function ShelfExperiencePage({ store, layout, onBack, onQrShelfDetected, isQrLoa
             diet_type: product.diet_type || mappedCatalog.diet_type,
             image_url: product.image_url || mappedCatalog.image_url,
             upc: product.upc || mappedCatalog.upc,
+            shelf_id: product.shelf_id || mappedCatalog.shelf_id,
+            shelf_name: product.shelf_name || mappedCatalog.shelf_name,
             price: product.price ?? mappedCatalog.price ?? null,
             id: product.id || mappedCatalog.id,
           }
@@ -1187,9 +1287,12 @@ function ShelfExperiencePage({ store, layout, onBack, onQrShelfDetected, isQrLoa
   const handleAskAI = async (overrideQuery) => {
     const query = String(overrideQuery ?? searchTerm).trim()
     if (!query) return
+    const requestSeq = chatRequestSeqRef.current + 1
+    chatRequestSeqRef.current = requestSeq
     setShowDropdown(false)
     setSearchTerm('')
     setChatProducts([])
+    setIsResolvingChatShelves(false)
 
     const selectedLabels = getSelectedProductLabels()
     const scopedQuery =
@@ -1238,13 +1341,15 @@ function ShelfExperiencePage({ store, layout, onBack, onQrShelfDetected, isQrLoa
 
         const extracted = []
         for (const line of lines) {
-          const numbered = line.match(/^\d+\.\s+(.+)$/)
-          const bulleted = line.match(/^[-*]\s+(.+)$/)
+          const numbered = line.match(/^\d+[.)]\s+(.+)$/)
+          const bulleted = line.match(/^[-*•]\s+(.+)$/)
           const raw = numbered?.[1] || bulleted?.[1] || ''
           if (!raw) continue
 
           const [beforeHyphen] = raw.split(/\s[-–—]\s/)
           const cleaned = beforeHyphen
+            .replace(/\*\*/g, '')
+            .replace(/`/g, '')
             .replace(/\bprice\s*[:\-].*$/i, '')
             .replace(/[.;:,]\s*$/, '')
             .trim()
@@ -1273,7 +1378,27 @@ function ShelfExperiencePage({ store, layout, onBack, onQrShelfDetected, isQrLoa
           lastToken = token
         }
 
-        if (!lastToken || typeof lastToken.index !== 'number') return []
+        if (!lastToken || typeof lastToken.index !== 'number') {
+          const productsLineMatch = rawText.match(/(?:^|\n)\s*(?:\*\*)?products(?:\*\*)?\s*:\s*(.+)$/im)
+          if (!productsLineMatch?.[1]) return []
+
+          const inlineParsed = productsLineMatch[1]
+            .split(',')
+            .map((name) => String(name || '').trim())
+            .map((name) => name.replace(/^['"*\s]+|['"*\s]+$/g, '').trim())
+            .filter(Boolean)
+
+          const uniqueInline = []
+          const seenInline = new Set()
+          inlineParsed.forEach((name) => {
+            const normalized = normalizeProductName(name)
+            if (!normalized || seenInline.has(normalized)) return
+            seenInline.add(normalized)
+            uniqueInline.push(name)
+          })
+
+          return uniqueInline
+        }
 
         const listStart = lastToken.index + lastToken[0].length
         const listEnd = rawText.lastIndexOf(')')
@@ -1301,6 +1426,7 @@ function ShelfExperiencePage({ store, layout, onBack, onQrShelfDetected, isQrLoa
       const isPlausibleProductName = (name) => {
         if (!name || typeof name !== 'string') return false
         const trimmed = String(name).trim()
+        const normalized = normalizeProductName(trimmed)
         const len = trimmed.length
 
         // Reject if too short
@@ -1308,6 +1434,11 @@ function ShelfExperiencePage({ store, layout, onBack, onQrShelfDetected, isQrLoa
 
         // Reject if too long (likely a sentence/paragraph)
         if (len > 150) return false
+
+        // Reject common placeholder tokens from prompt templates or malformed outputs.
+        if (['parameter', 'parameters', 'product', 'products', 'name', 'names', 'upc', 'upcs'].includes(normalized)) {
+          return false
+        }
 
         // Reject known metadata labels
         const metadataLabels = /^\s*(price|description|origin|shelf life|diet type|ingredients|brand|category|upc|sku|id|quantity|stock|availability|details?|type|size|weight|nutrition|allergen|expiry|expiration|manufactured|best by|storage|instructions|warnings|tags|notes|comments?)\s*$/i
@@ -1460,7 +1591,8 @@ function ShelfExperiencePage({ store, layout, onBack, onQrShelfDetected, isQrLoa
 
         // Optional secondary enrich from explicit backend product names.
         if (responseProductNames.length > 0) {
-          const nameProducts = await fetchProductsByNames(responseProductNames)
+          const validResponseProductNames = responseProductNames.filter(isPlausibleProductName)
+          const nameProducts = await fetchProductsByNames(validResponseProductNames)
           chatProds = mergeUniqueProducts(chatProds, nameProducts)
         }
 
@@ -1488,6 +1620,8 @@ function ShelfExperiencePage({ store, layout, onBack, onQrShelfDetected, isQrLoa
                 description: item?.description || '',
                 image_url: item?.image_url || item?.imageUrl || '',
                 upc: derivedUpc || '',
+                shelf_id: item?.shelf_id || item?.shelfId || item?.Shelf_ID || item?.shelf || item?.shelf_number || item?.Shelf_Number || '',
+                shelf_name: item?.shelf_name || item?.shelfName || item?.Shelf_Name || item?.fixtureDisplayName || '',
                 price: pickDisplayedPrice(item),
                 stock_count: item?.stock ?? item?.quantity ?? null,
               }
@@ -1544,27 +1678,88 @@ function ShelfExperiencePage({ store, layout, onBack, onQrShelfDetected, isQrLoa
         return ''
       }
 
-      const chatProductsWithValidUpc = (await Promise.all(
+      const hydratedChatProducts = (await Promise.all(
         chatProds.map(async (product) => {
           const resolvedUpc = await resolveUpcForChatProduct(product)
-          if (!hasUsableUpc(resolvedUpc)) {
-            return null
-          }
+          const finalUpc = hasUsableUpc(resolvedUpc)
+            ? resolvedUpc
+            : normalizeUpcValue(product?.upc || product?.UPC || '')
 
           return {
             ...product,
-            upc: resolvedUpc,
+            upc: finalUpc,
+            shelf_id: resolveProductShelfId(product, finalUpc),
           }
         })
       )).filter(Boolean)
 
-      setChatProducts(chatProductsWithValidUpc)
+      const dedupedChatProducts = []
+      const seenChatProducts = new Set()
+      hydratedChatProducts.forEach((product) => {
+        const key = normalizeProductName(product?.name || product?.product_name || product?.ProductName || product?.upc || product?.id || '')
+        if (!key || seenChatProducts.has(key)) return
+        if (!isPlausibleProductName(product?.name || product?.product_name || product?.ProductName || '')) return
+        seenChatProducts.add(key)
+        dedupedChatProducts.push(product)
+      })
+
+      if (chatRequestSeqRef.current !== requestSeq) {
+        return
+      }
+
+      // Show list immediately after answer; shelf IDs can hydrate in background.
+      setChatProducts(dedupedChatProducts)
+
+      const lookupNames = dedupedChatProducts
+        .map((product) => product?.name || product?.product_name || product?.ProductName || '')
+        .filter(Boolean)
+
+      if (lookupNames.length > 0) {
+        setIsResolvingChatShelves(true)
+        void (async () => {
+          try {
+            const lookupResponse = await fetchShelfLookupByProductNames(lookupNames)
+            const shelfByNormalized = lookupResponse?.shelves_by_normalized_name || {}
+
+            const enrichedChatProducts = dedupedChatProducts.map((product) => {
+              const currentShelf = resolveShelfIdFromRecord(product)
+              if (currentShelf) {
+                return {
+                  ...product,
+                  shelf_id: currentShelf,
+                }
+              }
+
+              const normalizedName = normalizeProductName(product?.name || product?.product_name || product?.ProductName || '')
+              const mappedShelfId = String(shelfByNormalized?.[normalizedName] || '').trim()
+
+              return {
+                ...product,
+                shelf_id: mappedShelfId || '',
+              }
+            })
+
+            if (chatRequestSeqRef.current !== requestSeq) {
+              return
+            }
+
+            setChatProducts(enrichedChatProducts)
+          } catch {
+            // Keep existing fallback shelf resolution when lookup endpoint fails.
+          } finally {
+            if (chatRequestSeqRef.current === requestSeq) {
+              setIsResolvingChatShelves(false)
+            }
+          }
+        })()
+      }
     } catch (err) {
       setChatHistory((prev) => [
         ...prev.slice(0, -1),
         { role: 'ai', text: 'Error: ' + err.message }
       ])
       setChatProducts([])
+      setIsResolvingChatShelves(false)
     }
   }
 
@@ -1574,24 +1769,56 @@ function ShelfExperiencePage({ store, layout, onBack, onQrShelfDetected, isQrLoa
   // Track source for each product: 'selected', 'chat', or 'shelf'
   const displayedProducts = useMemo(() => {
     const seen = new Set()
-    const ordered = []
-    const addUnique = (p, source = 'shelf') => {
+    const addUnique = (target, p, source = 'shelf') => {
       if (!p) return
       const key = normalizeProductName(p.name || p.product_name || p.ProductName || String(p.id || ''))
       if (!key || seen.has(key)) return
       seen.add(key)
       // For selected/chat items that are lightweight, try to fill from the enriched shelf list
       const shelfVersion = products.find((sp) => normalizeProductName(sp.name) === key)
-      const finalProduct = shelfVersion || p
+      const finalProduct = shelfVersion ? { ...shelfVersion } : { ...p }
+      const resolvedShelfId = shelfVersion
+        ? (currentShelfId || resolveShelfIdFromRecord(shelfVersion))
+        : resolveProductShelfId(finalProduct, finalProduct?.upc)
+      const isOnCurrentShelf = Boolean(shelfVersion) || (Boolean(currentShelfId) && resolvedShelfId === currentShelfId)
       // Mark source: if found on shelf, it's from shelf; otherwise keep the original source
       finalProduct._source = shelfVersion ? 'shelf' : source
-      ordered.push(finalProduct)
+      finalProduct._resolvedShelfId = resolvedShelfId
+      finalProduct._isOnCurrentShelf = isOnCurrentShelf
+      target.push(finalProduct)
     }
-    selectedProducts.forEach((p) => addUnique(p, 'selected'))
-    chatProducts.forEach((p) => addUnique(p, 'chat'))
-    filteredProducts.forEach((p) => addUnique(p, 'shelf'))
-    return ordered
-  }, [selectedProducts, chatProducts, filteredProducts, products])
+
+    const selectedOrdered = []
+    const chatOnShelfOrdered = []
+    const chatOffShelfOrdered = []
+    const shelfRemainderOrdered = []
+
+    selectedProducts.forEach((p) => addUnique(selectedOrdered, p, 'selected'))
+
+    chatProducts.forEach((p) => {
+      const normalized = normalizeProductName(p?.name || p?.product_name || p?.ProductName || String(p?.id || ''))
+      if (!normalized || seen.has(normalized)) return
+
+      const shelfVersion = products.find((sp) => normalizeProductName(sp.name) === normalized)
+      const candidate = shelfVersion ? { ...shelfVersion } : { ...p }
+      const resolvedShelfId = shelfVersion
+        ? (currentShelfId || resolveShelfIdFromRecord(shelfVersion))
+        : resolveProductShelfId(candidate, candidate?.upc)
+      const isOnCurrentShelf = Boolean(shelfVersion) || (Boolean(currentShelfId) && resolvedShelfId === currentShelfId)
+
+      const targetBucket = isOnCurrentShelf ? chatOnShelfOrdered : chatOffShelfOrdered
+      addUnique(targetBucket, p, 'chat')
+    })
+
+    filteredProducts.forEach((p) => addUnique(shelfRemainderOrdered, p, 'shelf'))
+
+    return [
+      ...selectedOrdered,
+      ...chatOnShelfOrdered,
+      ...chatOffShelfOrdered,
+      ...shelfRemainderOrdered,
+    ]
+  }, [selectedProducts, chatProducts, filteredProducts, products, currentShelfId])
 
   const aiResultNameSet = useMemo(() => {
     const names = chatProducts
@@ -2202,6 +2429,16 @@ function ShelfExperiencePage({ store, layout, onBack, onQrShelfDetected, isQrLoa
                   <span>Loading product prices and details…</span>
                 </p>
               )}
+              {!loading && !error && isResolvingChatShelves && (
+                <p className="shelf-page__status shelf-page__status--with-loader" aria-live="polite">
+                  <span className="shelf-page__inline-loader" aria-hidden="true">
+                    <span className="shelf-page__inline-loader-dot" />
+                    <span className="shelf-page__inline-loader-dot" />
+                    <span className="shelf-page__inline-loader-dot" />
+                  </span>
+                  <span>Resolving shelf numbers for listed products…</span>
+                </p>
+              )}
               {error && <p className="shelf-page__error">{error}</p>}
 
               {!loading && !error && displayedProducts.length === 0 && (
@@ -2212,7 +2449,8 @@ function ShelfExperiencePage({ store, layout, onBack, onQrShelfDetected, isQrLoa
                 {displayedProducts.map((product, i) => {
                   const key = product.id ?? i
                   const source = product._source || 'shelf'
-                  const isOffShelf = source === 'chat' && !products.some(sp => normalizeProductName(sp.name) === normalizeProductName(product.name))
+                  const isOffShelf = source === 'chat' && product._isOnCurrentShelf === false
+                  const offShelfLabel = isOffShelf && product._resolvedShelfId ? `Shelf ${product._resolvedShelfId}` : ''
                   const isAiResult = aiResultNameSet.has(normalizeProductName(product.name || product.product_name || product.ProductName || ''))
                   return (
                     <ProductCard
@@ -2225,6 +2463,7 @@ function ShelfExperiencePage({ store, layout, onBack, onQrShelfDetected, isQrLoa
                       onSelectToggle={() => toggleSelectedProduct(product)}
                       source={source}
                       isOffShelf={isOffShelf}
+                      offShelfLabel={offShelfLabel}
                       isAiResult={isAiResult}
                     />
                   )

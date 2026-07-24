@@ -207,6 +207,20 @@ export const fetchProductById = async (id) => {
     return response.json();
 };
 
+export const fetchShelfLookupByProductNames = async (productNames) => {
+    const safeNames = Array.isArray(productNames)
+        ? productNames.map((name) => String(name || '').trim()).filter(Boolean)
+        : [];
+
+    const response = await runtimeFetch(`${FLASK_BASE_URL}/api/layout/shelf-lookup`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ product_names: safeNames }),
+    });
+
+    return response.json();
+};
+
 export const sendAgentQuery = async (query) => {
     const response = await runtimeFetch(`${FLASK_BASE_URL}/api/agent-query`, {
         method: 'POST',

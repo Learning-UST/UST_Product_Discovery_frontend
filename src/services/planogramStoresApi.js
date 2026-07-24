@@ -5,7 +5,7 @@ const DEFAULT_STORE_SCAN_BATCH_SIZE = 50
 const DEFAULT_STORE_SCAN_MISS_STREAK_LIMIT = 15
 const DEFAULT_STORE_REQUEST_TIMEOUT_MS = 10000
 const DEFAULT_STORES_CACHE_TTL_MS = 60000
-const DEFAULT_ENABLE_STORE_ID_SCAN = false
+const DEFAULT_ENABLE_STORE_ID_SCAN = true
 const STORES_CACHE_KEY = 'planogramStoresCache:v1'
 
 let storesRequestInFlight = null
@@ -379,6 +379,61 @@ const dedupeStrings = (items) => {
     return output
 }
 
+const extractStoreList = (payload) => {
+    if (Array.isArray(payload)) {
+        return payload
+    }
+
+    if (!payload || typeof payload !== 'object') {
+        return []
+    }
+
+    const candidates = [
+        payload?.stores,
+        payload?.data,
+        payload?.results,
+        payload?.items,
+        payload?.rows,
+    ]
+
+    for (const candidate of candidates) {
+        if (Array.isArray(candidate)) {
+            return candidate
+        }
+    }
+
+    return []
+}
+
+const extractStoreRecord = (payload) => {
+    if (!payload || typeof payload !== 'object') {
+        return null
+    }
+
+    const candidates = [
+        payload,
+        payload?.store,
+        payload?.data,
+        payload?.result,
+        payload?.item,
+    ]
+
+    for (const candidate of candidates) {
+        if (candidate && typeof candidate === 'object' && !Array.isArray(candidate)) {
+            if (
+                candidate?.id !== undefined ||
+                candidate?.name !== undefined ||
+                candidate?.layout_data !== undefined ||
+                candidate?.user_id !== undefined
+            ) {
+                return candidate
+            }
+        }
+    }
+
+    return null
+}
+
 const mapSavedLayoutForUi = (layout, index) => {
     const rawName = trimValue(layout?.name)
     return {
@@ -510,7 +565,8 @@ const fetchStoreByIdRaw = async (storeId) => {
             throw new Error(`Planogram store details failed: ${response.status}`)
         }
 
-        return response.json()
+        const payload = await response.json()
+        return extractStoreRecord(payload)
     }
 
     const controller = new AbortController()
@@ -537,7 +593,8 @@ const fetchStoreByIdRaw = async (storeId) => {
         throw new Error(`Planogram store details failed: ${response.status}`)
     }
 
-    return response.json()
+    const payload = await response.json()
+    return extractStoreRecord(payload)
 }
 
 const readStoresCache = () => {
@@ -672,7 +729,7 @@ const fetchPlanogramStoresInternal = async ({ identity } = {}) => {
             const stores = await fetchJsonWithTimeout('/api/stores', {
                 [resolvedIdentity.key]: resolvedIdentity.value,
             }, requestTimeoutMs)
-            const storeList = toArray(stores)
+            const storeList = extractStoreList(stores)
             if (storeList.length > 0) {
                 writeStoresCache(storeList)
                 return {
@@ -689,7 +746,7 @@ const fetchPlanogramStoresInternal = async ({ identity } = {}) => {
     let listRequestStatus = null
     try {
         const allStores = await fetchJsonWithTimeout('/api/stores', {}, requestTimeoutMs)
-        const storeList = toArray(allStores)
+        const storeList = extractStoreList(allStores)
         if (storeList.length > 0) {
             writeStoresCache(storeList)
             return {
@@ -707,10 +764,7 @@ const fetchPlanogramStoresInternal = async ({ identity } = {}) => {
     }
 
     const { enableIdScan } = getStoreScanConfig()
-    const shouldAttemptIdScan =
-        enableIdScan &&
-        // If stores listing is rejected with 400 and we have no identity, avoid noisy probing.
-        !(listRequestStatus === 400 && !resolvedIdentity)
+    const shouldAttemptIdScan = enableIdScan
 
     if (!shouldAttemptIdScan) {
         return {
@@ -749,9 +803,14 @@ export const fetchPlanogramStores = async ({ identity } = {}) => {
 }
 
 export const fetchPlanogramStoreById = async (storeId) => {
-    const store = await fetchJson(`/api/stores/${storeId}`, {
+    const storePayload = await fetchJson(`/api/stores/${storeId}`, {
         includePreview: 'false',
     })
+    const store = extractStoreRecord(storePayload)
+
+    if (!store) {
+        throw new Error('Planogram store details failed: invalid payload')
+    }
 
     const { requestTimeoutMs } = getStoreScanConfig()
     const layoutsById = new Map()
